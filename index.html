@@ -41,7 +41,7 @@ const program = (() => {
   in vec4 v_color;
   out vec4 outColor;
 
-  void main() { outColor = v_color + vec4(0.5, 0.5, 0.5, 1); }
+  void main() { outColor = v_color; }
   `;
 
   function createShader(gl, type, source) {
@@ -78,37 +78,50 @@ const positionAttributeLocation = gl.getAttribLocation(program, "a_position");
 const colorAttributeLocation = gl.getAttribLocation(program, "a_color");
 const vbuf = gl.createBuffer();
 
-const vertSize = Float32Array.BYTES_PER_ELEMENT * 8;
+const vertFloats = 8;
+const vertBytes = Float32Array.BYTES_PER_ELEMENT * vertFloats;
 
-// Bind it to ARRAY_BUFFER (think of it as ARRAY_BUFFER = vbuf)
-gl.bindBuffer(gl.ARRAY_BUFFER, vbuf);
-gl.bufferData(gl.ARRAY_BUFFER, vertSize * 3, gl.DYNAMIC_DRAW);
+function createVbuf(nverts) {
 
-gl.enableVertexAttribArray(positionAttributeLocation);
-gl.enableVertexAttribArray(colorAttributeLocation);
+  // Bind it to ARRAY_BUFFER (think of it as ARRAY_BUFFER = vbuf)
+  gl.bindBuffer(gl.ARRAY_BUFFER, vbuf);
+  gl.bufferData(gl.ARRAY_BUFFER, vertBytes * nverts, gl.DYNAMIC_DRAW);
 
-const colorStart = Float32Array.BYTES_PER_ELEMENT * 4;
-/* size, type, normalize, stride, offset */
-gl.vertexAttribPointer(
-  positionAttributeLocation, 2, gl.FLOAT, false, vertSize, 0);
-gl.vertexAttribPointer(
-  colorAttributeLocation, 4, gl.FLOAT, false, vertSize, colorStart);
+  gl.enableVertexAttribArray(positionAttributeLocation);
+  gl.enableVertexAttribArray(colorAttributeLocation);
 
-gl.useProgram(program);
+  const colorStart = Float32Array.BYTES_PER_ELEMENT * 4;
+  /* size, type, normalize, stride, offset */
+  gl.vertexAttribPointer(
+    positionAttributeLocation, 2, gl.FLOAT, false, vertBytes, 0);
+  gl.vertexAttribPointer(
+    colorAttributeLocation, 4, gl.FLOAT, false, vertBytes, colorStart);
+}
+
 
 (async () => {
   const wasmSrc = fetch("build/main.wasm");
+
+  let nverts;
+  let vbuf, mem;
   const { instance } =
     await WebAssembly.instantiateStreaming(wasmSrc, { env: {
+      vbuf: (ptr, len) => {
+        nverts = len;
+        vbuf = new Float32Array(mem, ptr, len * vertFloats);
+      },
       print: console.log,
       cosf: Math.cos,
       sinf: Math.sin,
       sqrtf: Math.sqrt,
     } });
   const wasm = instance.exports;
+  mem = wasm.memory.buffer;
 
   wasm.init();
-  const vbuf = new Float32Array(wasm.memory.buffer, wasm.vbuf(), 8 * 3);
+
+  createVbuf(nverts);
+  gl.useProgram(program);
 
   (window.onresize = () => {
     // Tell WebGL how to convert from clip space to pixels
@@ -127,7 +140,7 @@ gl.useProgram(program);
     wasm.frame(canvas.width, canvas.height, time);
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, vbuf);
 
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.drawArrays(gl.TRIANGLES, 0, nverts);
     requestAnimationFrame(frame);
   });
 
