@@ -26,15 +26,22 @@ if (!gl) throw new Error("couldn't get gl context");
 
 const program = (() => {
   const vertexShaderSource = `#version 300 es
-  in vec4 a_position;
-  void main() { gl_Position = a_position; }
+  precision highp float;
+
+  in vec2 a_position;
+  in vec4 a_color;
+
+  out vec4 v_color;
+
+  void main() { gl_Position = vec4(a_position, 0, 1); v_color = a_color; }
   `;
 
   const fragmentShaderSource = `#version 300 es
   precision highp float;
+  in vec4 v_color;
   out vec4 outColor;
 
-  void main() { outColor = vec4(0.0, 0.2, 0.5, 1); }
+  void main() { outColor = v_color + vec4(0.5, 0.5, 0.5, 1); }
   `;
 
   function createShader(gl, type, source) {
@@ -68,29 +75,26 @@ const program = (() => {
 
 // look up where the vertex data needs to go.
 const positionAttributeLocation = gl.getAttribLocation(program, "a_position");
-const positionBuffer = gl.createBuffer();
+const colorAttributeLocation = gl.getAttribLocation(program, "a_color");
+const vbuf = gl.createBuffer();
 
-// Bind it to ARRAY_BUFFER (think of it as ARRAY_BUFFER = positionBuffer)
-gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+const vertSize = Float32Array.BYTES_PER_ELEMENT * 8;
 
-gl.bufferData(gl.ARRAY_BUFFER, 3 * 2 * 4, gl.DYNAMIC_DRAW);
+// Bind it to ARRAY_BUFFER (think of it as ARRAY_BUFFER = vbuf)
+gl.bindBuffer(gl.ARRAY_BUFFER, vbuf);
+gl.bufferData(gl.ARRAY_BUFFER, vertSize * 3, gl.DYNAMIC_DRAW);
 
-
-const vao = gl.createVertexArray();
-gl.bindVertexArray(vao);
 gl.enableVertexAttribArray(positionAttributeLocation);
+gl.enableVertexAttribArray(colorAttributeLocation);
 
-// Tell the attribute how to get data out of positionBuffer (ARRAY_BUFFER)
-const size = 2;          // 2 components per iteration
-const type = gl.FLOAT;   // the data is 32bit floats
-const normalize = false; // don't normalize the data
-const stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next position
-const offset = 0;        // start at the beginning of the buffer
+const colorStart = Float32Array.BYTES_PER_ELEMENT * 4;
+/* size, type, normalize, stride, offset */
 gl.vertexAttribPointer(
-    positionAttributeLocation, size, type, normalize, stride, offset);
+  positionAttributeLocation, 2, gl.FLOAT, false, vertSize, 0);
+gl.vertexAttribPointer(
+  colorAttributeLocation, 4, gl.FLOAT, false, vertSize, colorStart);
 
 gl.useProgram(program);
-gl.bindVertexArray(vao);
 
 (async () => {
   const wasmSrc = fetch("build/main.wasm");
@@ -104,7 +108,7 @@ gl.bindVertexArray(vao);
   const wasm = instance.exports;
 
   wasm.init();
-  const vbuf = new Float32Array(wasm.memory.buffer, wasm.vbuf(), 6);
+  const vbuf = new Float32Array(wasm.memory.buffer, wasm.vbuf(), 8 * 3);
 
   (window.onresize = () => {
     // Tell WebGL how to convert from clip space to pixels
