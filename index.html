@@ -76,16 +76,16 @@ const program = (() => {
 // look up where the vertex data needs to go.
 const positionAttributeLocation = gl.getAttribLocation(program, "a_position");
 const colorAttributeLocation = gl.getAttribLocation(program, "a_color");
-const vbuf = gl.createBuffer();
+const gl_vbuf = gl.createBuffer();
 
 const vertFloats = 8;
 const vertBytes = Float32Array.BYTES_PER_ELEMENT * vertFloats;
 
-function createVbuf(nverts) {
+function createVbuf(vcount) {
 
-  // Bind it to ARRAY_BUFFER (think of it as ARRAY_BUFFER = vbuf)
-  gl.bindBuffer(gl.ARRAY_BUFFER, vbuf);
-  gl.bufferData(gl.ARRAY_BUFFER, vertBytes * nverts, gl.DYNAMIC_DRAW);
+  // Bind it to ARRAY_BUFFER (think of it as ARRAY_BUFFER = gl_vbuf)
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl_vbuf);
+  gl.bufferData(gl.ARRAY_BUFFER, vertBytes * vcount, gl.DYNAMIC_DRAW);
 
   gl.enableVertexAttribArray(positionAttributeLocation);
   gl.enableVertexAttribArray(colorAttributeLocation);
@@ -98,17 +98,28 @@ function createVbuf(nverts) {
     colorAttributeLocation, 4, gl.FLOAT, false, vertBytes, colorStart);
 }
 
+const gl_ibuf = gl.createBuffer();
+function createIbuf(icount) {
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl_ibuf);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,
+                icount * Uint16Array.BYTES_PER_ELEMENT,
+                gl.DYNAMIC_DRAW);
+}
 
 (async () => {
   const wasmSrc = fetch("build/main.wasm");
 
-  let nverts;
-  let vbuf, mem;
+  let vcount, icount;
+  let vbuf, ibuf, mem;
   const { instance } =
     await WebAssembly.instantiateStreaming(wasmSrc, { env: {
       vbuf: (ptr, len) => {
-        nverts = len;
+        vcount = len;
         vbuf = new Float32Array(mem, ptr, len * vertFloats);
+      },
+      ibuf: (ptr, len) => {
+        icount = len;
+        ibuf = new Uint16Array(mem, ptr, len);
       },
       print: console.log,
       cosf: Math.cos,
@@ -120,7 +131,8 @@ function createVbuf(nverts) {
 
   wasm.init();
 
-  createVbuf(nverts);
+  createVbuf(vcount);
+  createIbuf(icount);
   gl.useProgram(program);
 
   (window.onresize = () => {
@@ -139,8 +151,9 @@ function createVbuf(nverts) {
 
     wasm.frame(canvas.width, canvas.height, time);
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, vbuf);
+    gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, ibuf);
 
-    gl.drawArrays(gl.TRIANGLES, 0, nverts);
+    gl.drawElements(gl.TRIANGLES, icount, gl.UNSIGNED_SHORT, 0);
     requestAnimationFrame(frame);
   });
 
