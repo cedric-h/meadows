@@ -1,8 +1,14 @@
 #include <stdint.h>
+#include <stddef.h>
 
 #define M_PI 3.141592653589793
 #define GOLDEN_RATIO (1.618034f)
 #define ARR_LEN(arr) (sizeof(arr) / sizeof(arr[0]))
+
+static float round_tof(float x, float n) { return n * (int)(x/n); }
+
+#define STB_PERLIN_IMPLEMENTATION
+#include "stb_perlin.h"
 
 #define WASM_EXPORT __attribute__((visibility("default")))
 extern float cosf(float);
@@ -11,6 +17,8 @@ extern float sqrtf(float);
 extern float printf(float);
 extern void vbuf(void *ptr, int len);
 extern void ibuf(void *ptr, int len);
+
+static float fmaxf(float a, float b) { return (a > b) ? a : b; }
 
 typedef struct { float x, y; } Vec2;
 static Vec2 vec2_unit_from_rads(float rads) {
@@ -57,18 +65,42 @@ WASM_EXPORT Color color_picked = { 0.0f, 0.0f, 0.0f, 1.0f };
 typedef struct { Vec2 pos; float z, _pad0; Color color; } Vert;
 
 static struct {
-  Vert vbuf[1 << 10];
-  uint16_t ibuf[1 << 11];
+  Vert vbuf[1 << 12];
+  uint16_t ibuf[1 << 13];
+
+  int width, height;
+  float zoom;
+
+  struct {
+    uint8_t active;
+    struct { int x, y; } mouse_start;
+    struct { float x, y; } cam_start;
+  } drag;
+
+  Vec2 cam;
 } state = {0};
 
 /* a collection of geometry (vertices, indices) you can write into */
 typedef struct {
   Vert *vbuf;
   Vert *vbuf_base;
+  size_t vbuf_max;
 
   uint16_t *ibuf;
   uint16_t *ibuf_base;
+  size_t ibuf_max;
 } Geo;
+
+/* note: doesn't un-zoom (should it?) */
+static Vec2 px_to_world_space(int x, int y) {
+  float aspect = (float)state.height / (float)state.width;
+  Vec2 ret = { x, y };
+  ret.x /= state.width;
+  ret.y /= state.height;
+  
+  ret.x /= aspect;
+  return ret;
+}
 
 static void geo_apply_cam(Geo *geo, float width, float height) {
   float min_z = -1.0f;
@@ -82,57 +114,78 @@ static void geo_apply_cam(Geo *geo, float width, float height) {
      more height: zoom in */
   float aspect = (float)height / (float)width;
   for (Vert *p = geo->vbuf_base; p != geo->vbuf; p++) {
+    p->pos.x += state.cam.x;
+    p->pos.y += state.cam.y;
+
     p->pos.x *= aspect;
     p->z = ((p->z - min_z) / (max_z - min_z))*2.0f - 1.0f;
     p->z *= 0.99999f;
 
-    p->pos.x /= 5.0f;
-    p->pos.y /= 5.0f;
+    // zoom
+    p->pos.x /= state.zoom;
+    p->pos.y /= state.zoom;
 
-    /* actually being centered is good */
-    // p->pos.x = 2.0f*p->pos.x - 1.0f;
-    // p->pos.y = 2.0f*p->pos.y - 1.0f;
+    // 0..1 is good actually
+    p->pos.x = p->pos.x * 2.0f - 1.0f;
+    p->pos.y = p->pos.y * 2.0f - 1.0f;
   }
+}
+
+static void geo_ibuf_push(Geo *geo, uint16_t a, uint16_t b, uint16_t c) {
+  if ((geo->ibuf - geo->ibuf_base) < geo->ibuf_max)
+    *geo->ibuf++ = a, *geo->ibuf++ = b, *geo->ibuf++ = c;
+}
+
+static void geo_vbuf_push(Geo *geo, Vert v) {
+  if ((geo->vbuf - geo->vbuf_base) < geo->vbuf_max)
+    *geo->vbuf++ = v;
 }
 
 static void geo_quad(Geo *geo, Vert tl, Vert tr, Vert br, Vert bl) {
   int i = geo->vbuf - geo->vbuf_base;
 
-  *geo->vbuf++ = tl;
-  *geo->vbuf++ = tr;
-  *geo->vbuf++ = br;
-  *geo->vbuf++ = bl;
+  geo_vbuf_push(geo, tl);
+  geo_vbuf_push(geo, tr);
+  geo_vbuf_push(geo, br);
+  geo_vbuf_push(geo, bl);
 
-  *geo->ibuf++ = i+0, *geo->ibuf++ = i+1, *geo->ibuf++ = i+2;
-  *geo->ibuf++ = i+2, *geo->ibuf++ = i+1, *geo->ibuf++ = i+3;
+  geo_ibuf_push(geo, i+0, i+1, i+2);
+  geo_ibuf_push(geo, i+2, i+1, i+3);
 }
 
 static void geo_tri(Geo *geo, Vert a, Vert b, Vert c) {
   int i = geo->vbuf - geo->vbuf_base;
 
-  *geo->vbuf++ = a;
-  *geo->vbuf++ = b;
-  *geo->vbuf++ = c;
+  geo_vbuf_push(geo, a);
+  geo_vbuf_push(geo, b);
+  geo_vbuf_push(geo, c);
 
-  *geo->ibuf++ = i+0, *geo->ibuf++ = i+1, *geo->ibuf++ = i+2;
+  geo_ibuf_push(geo, i+0, i+1, i+2);
 }
 
 static void geo_ngon(Geo *geo, Color c, float z, float x, float y, float r, float n) {
   int i;
   int center = geo->vbuf - geo->vbuf_base;
-  *geo->vbuf++ = (Vert) { .pos = { x, y }, .z=z, .color = c };
+  geo_vbuf_push(geo, (Vert) { .pos = { x, y }, .z=z, .color = c });
+
+  #define CIRC_VERT(n) ((Vert) {   \
+      .pos = { x + cosf(a*n)*r,    \
+               y + sinf(a*n)*r  }, \
+      .z = z,                      \
+      .color = c                   \
+    })
 
   float a = (M_PI*2)/n;
   int start = geo->vbuf - geo->vbuf_base;
-  *geo->vbuf++ = (Vert) { .pos = { x + cosf(a*1)*r, y + sinf(a*1)*r }, .z=z, .color = c };
+  geo_vbuf_push(geo, CIRC_VERT(1));
 
   for (int ni = 2; ni < (n+1); ni++) {
     i = geo->vbuf - geo->vbuf_base;
-    *geo->vbuf++ = (Vert) { .pos = { x + cosf(a*ni)*r, y + sinf(a*ni)*r }, .z=z, .color = c };
-    *geo->ibuf++ = i, *geo->ibuf++ = center, *geo->ibuf++ = i-1;
+    geo_vbuf_push(geo, CIRC_VERT(ni));
+    geo_ibuf_push(geo, i, center, i-1);
   }
 
-  *geo->ibuf++ = start, *geo->ibuf++ = center, *geo->ibuf++ = i;
+  geo_ibuf_push(geo, start, center, i);
 }
 static void geo_8gon(Geo *geo, Color c, float z, float x, float y, float r) {
   geo_ngon(geo, c, z, x, y, r, 8.0f);
@@ -185,27 +238,98 @@ static void geo_tree(Geo *geo, float x, float y) {
 }
 
 WASM_EXPORT void init(void) {
+  state.zoom = 1.0f;
   vbuf(state.vbuf, ARR_LEN(state.vbuf));
   ibuf(state.ibuf, ARR_LEN(state.ibuf));
 }
 
+typedef enum {
+  MouseEventKind_Down,
+  MouseEventKind_Up,
+  MouseEventKind_Move,
+} MouseEventKind;
+WASM_EXPORT void mouse(MouseEventKind mouse_event_kind, int x, int y) {
+  switch (mouse_event_kind) {
+    case MouseEventKind_Up: 
+      state.drag.active = 0;
+      break;
+    case MouseEventKind_Down: 
+      if (!state.drag.active) {
+        state.drag.active = 1;
+        state.drag.mouse_start.x = x;
+        state.drag.mouse_start.y = y;
+        state.drag.cam_start.x = state.cam.x;
+        state.drag.cam_start.y = state.cam.y;
+      }
+      break;
+    case MouseEventKind_Move: 
+      if (state.drag.active) {
+        Vec2 p = px_to_world_space(
+          x - state.drag.mouse_start.x,
+          y - state.drag.mouse_start.y 
+        );
+        state.cam.x = state.drag.cam_start.x + p.x * state.zoom;
+        state.cam.y = state.drag.cam_start.y - p.y * state.zoom;
+      }
+      break;
+  }
+}
+
+WASM_EXPORT void zoom(int x, int y, float delta_pixels) {
+  float t = 1.0f - delta_pixels / fmaxf(state.width, state.height);
+  #define X_SIZE (state.zoom * (float)state. width)
+  #define Y_SIZE (state.zoom * (float)state.height)
+  float x_size_before = X_SIZE;
+  float y_size_before = Y_SIZE;
+
+  /* --- apply zoom --- */
+  state.zoom *= t;
+
+  Vec2 p = px_to_world_space(
+    (x_size_before - X_SIZE)/2.0f,
+    (y_size_before - Y_SIZE)/2.0f
+  );
+  state.cam.x -= p.x;
+  state.cam.y -= p.y;
+
+  #undef X_SIZE
+  #undef Y_SIZE
+}
+
 WASM_EXPORT void frame(int width, int height, float dt) {
+  state. width =  width;
+  state.height = height;
+
   Geo geo = {
     .vbuf      = state.vbuf,
     .vbuf_base = state.vbuf,
+    .vbuf_max  = ARR_LEN(state.vbuf),
     .ibuf      = state.ibuf,
     .ibuf_base = state.ibuf,
+    .ibuf_max  = ARR_LEN(state.ibuf),
   };
+  __builtin_memset(state.ibuf, 0, sizeof(state.ibuf));
 
   float aspect = (float)width/(float)height;
   Color bg = { 0.15f, 0.61f, 0.33f, 1.00f };
-  geo_rect(&geo, bg, 2.0f, 0.0f,0.0f, 10.0f*aspect, 10.0f);// 1.0f*aspect,2.0f);
+  geo_rect(&geo, bg, 1.0f, aspect/2,0.5f, aspect,1.0f);// 1.0f*aspect,2.0f);
 
   // geo_rect(&geo, COLOR_GREEN, -0.1f, 0.1f,0.1f, 0.2f,0.2f);
   // geo_rect(&geo, COLOR_RED  , -0.2f, 0.0f,0.0f, 0.2f,0.2f);
   // geo_rect(&geo, COLOR_BLUE , -0.3f, 0.2f,0.2f, 0.2f,0.2f);
 
-  geo_tree(&geo, 0.0f, 0.0f);
+  // geo_tree(&geo, 0.0f, 0.0f);
+
+  Vec2 min = { -round_tof(state.cam.x, 0.1f) - 0.1f,
+               -round_tof(state.cam.y, 0.1f) - 0.1f };
+  Vec2 max = { min.x + state.zoom * aspect + 0.3f ,
+               min.y + state.zoom          + 0.3f };
+
+  for (  float x = min.x+0.05f; x < max.x; x += 0.1f)
+    for (float y = min.y+0.05f; y < max.y; y += 0.1f) {
+      float size = 0.10f * fabsf(stb_perlin_fbm_noise3(x,y,0.0f, 2,0.5f,6));
+      geo_rect(&geo, COLOR_TREEBORDER, -0.1f, x,y, size,size);
+    }
 
   geo_apply_cam(&geo, width, height);
 }
