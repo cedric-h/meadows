@@ -19,6 +19,7 @@ extern void vbuf(void *ptr, int len);
 extern void ibuf(void *ptr, int len);
 
 static float fmaxf(float a, float b) { return (a > b) ? a : b; }
+static float fminf(float a, float b) { return (a < b) ? a : b; }
 
 typedef struct { float x, y; } Vec2;
 static Vec2 vec2_unit_from_rads(float rads) {
@@ -54,19 +55,21 @@ WASM_EXPORT Color color_picked = { 0.0f, 0.0f, 0.0f, 1.0f };
 
 #define COLOR_SLOTCOLOR     ((Color) { 0.42f, 0.40f, 0.39f, 1.00f })
 #define COLOR_DARKSLOTCOLOR ((Color) { 0.32f, 0.30f, 0.29f, 1.00f })
-#define COLOR_FORESTSHADOW  ((Color) { 0.07f, 0.55f, 0.27f, 1.00f })
 #define COLOR_TREEBORDER    ((Color) { 0.00f, 0.42f, 0.13f, 1.00f })
 #define COLOR_TREEGREEN     ((Color) { 0.00f, 0.46f, 0.17f, 1.00f })
 #define COLOR_TREEGREEN1    ((Color) { 0.04f, 0.50f, 0.21f, 1.00f })
 #define COLOR_TREEGREEN2    ((Color) { 0.08f, 0.54f, 0.25f, 1.00f })
 #define COLOR_TREEGREEN3    ((Color) { 0.12f, 0.58f, 0.29f, 1.00f })
 #define COLOR_BARK          ((Color) { 0.37f, 0.32f, 0.29f, 1.00f })
+#define COLOR_GRASS_TOP     ((Color) { 0.15f, 0.61f, 0.33f, 1.00f })
+#define COLOR_FORESTSHADOW  ((Color) { 0.01f, 0.46f, 0.27f, 1.00f })
+#define COLOR_GRASS_BOTTOM  ((Color) { 0.05f, 0.51f, 0.29f, 1.00f })
 
 typedef struct { Vec2 pos; float z, _pad0; Color color; } Vert;
 
 static struct {
-  Vert vbuf[1 << 12];
-  uint16_t ibuf[1 << 13];
+  Vert vbuf[1 << 16];
+  uint16_t ibuf[1 << 17];
 
   int width, height;
   float zoom;
@@ -134,11 +137,15 @@ static void geo_apply_cam(Geo *geo, float width, float height) {
 static void geo_ibuf_push(Geo *geo, uint16_t a, uint16_t b, uint16_t c) {
   if ((geo->ibuf - geo->ibuf_base) < geo->ibuf_max)
     *geo->ibuf++ = a, *geo->ibuf++ = b, *geo->ibuf++ = c;
+  else
+    printf(500);
 }
 
 static void geo_vbuf_push(Geo *geo, Vert v) {
   if ((geo->vbuf - geo->vbuf_base) < geo->vbuf_max)
     *geo->vbuf++ = v;
+  else
+    printf(500);
 }
 
 static void geo_quad(Geo *geo, Vert tl, Vert tr, Vert br, Vert bl) {
@@ -218,27 +225,35 @@ static void geo_rect(Geo *geo, Color c, float z, float x, float y, float w, floa
                       (Vec2) { .x = x+w/2, .y = y}, h);
 }
 
-static void geo_tree(Geo *geo, float x, float y) {
+static void geo_tree(Geo *geo, float x, float _y, float size) {
+  Vert *start = geo->vbuf;
   float w = 0.8f, h = GOLDEN_RATIO, r = 0.4f;
+  float y = _y - 0.2f;
+
   geo_ngon(geo, COLOR_BARK, y, x,       y + r, r, 32);
   geo_rect(geo, COLOR_BARK, y, x, h/2 + y + r, w, h);
 
-  geo_8gon(geo, COLOR_TREEGREEN , y - 1.1f, x + 0.80f, y + 2.2f, 0.8f);
-  geo_8gon(geo, COLOR_TREEGREEN1, y - 1.1f, x + 0.16f, y + 3.0f, 1.0f);
-  geo_8gon(geo, COLOR_TREEGREEN2, y - 1.1f, x - 0.80f, y + 2.5f, 0.9f);
-  geo_8gon(geo, COLOR_TREEGREEN3, y - 1.1f, x - 0.16f, y + 2.0f, 0.8f);
+  geo_8gon(geo, COLOR_TREEGREEN , y - 1.8f, x + 0.80f, y + 2.2f, 0.8f);
+  geo_8gon(geo, COLOR_TREEGREEN1, y - 1.8f, x + 0.16f, y + 3.0f, 1.0f);
+  geo_8gon(geo, COLOR_TREEGREEN2, y - 1.8f, x - 0.80f, y + 2.5f, 0.9f);
+  geo_8gon(geo, COLOR_TREEGREEN3, y - 1.8f, x - 0.16f, y + 2.0f, 0.8f);
 
   geo_8gon(geo, COLOR_TREEBORDER, y, x + 0.80f, y + 2.2f, 0.8f+0.1f);
   geo_8gon(geo, COLOR_TREEBORDER, y, x + 0.16f, y + 3.0f, 1.0f+0.1f);
   geo_8gon(geo, COLOR_TREEBORDER, y, x - 0.80f, y + 2.5f, 0.9f+0.1f);
   geo_8gon(geo, COLOR_TREEBORDER, y, x - 0.16f, y + 2.0f, 0.8f+0.1f);
 
-  float sr = 0.92f;
+  float sr = 1.22f;
   geo_8gon(geo, COLOR_FORESTSHADOW, y + sr, x, y + r, sr);
+
+  for (Vert *v = start; v != geo->vbuf; v++)
+    v->pos.x += (size - 1.0f) * (v->pos.x -  x),
+    v->pos.y += (size - 1.0f) * (v->pos.y - _y),
+    v->    z += (size - 1.0f) * (v->    z - _y);
 }
 
 WASM_EXPORT void init(void) {
-  state.zoom = 1.0f;
+  state.zoom = 5.0f;
   vbuf(state.vbuf, ARR_LEN(state.vbuf));
   ibuf(state.ibuf, ARR_LEN(state.ibuf));
 }
@@ -284,6 +299,7 @@ WASM_EXPORT void zoom(int x, int y, float delta_pixels) {
 
   /* --- apply zoom --- */
   state.zoom *= t;
+  printf(state.zoom);
 
   Vec2 p = px_to_world_space(
     (x_size_before - X_SIZE)/2.0f,
@@ -311,25 +327,41 @@ WASM_EXPORT void frame(int width, int height, float dt) {
   __builtin_memset(state.ibuf, 0, sizeof(state.ibuf));
 
   float aspect = (float)width/(float)height;
-  Color bg = { 0.15f, 0.61f, 0.33f, 1.00f };
-  geo_rect(&geo, bg, 1.0f, aspect/2,0.5f, aspect,1.0f);// 1.0f*aspect,2.0f);
 
   // geo_rect(&geo, COLOR_GREEN, -0.1f, 0.1f,0.1f, 0.2f,0.2f);
   // geo_rect(&geo, COLOR_RED  , -0.2f, 0.0f,0.0f, 0.2f,0.2f);
   // geo_rect(&geo, COLOR_BLUE , -0.3f, 0.2f,0.2f, 0.2f,0.2f);
 
-  // geo_tree(&geo, 0.0f, 0.0f);
-
-  Vec2 min = { -round_tof(state.cam.x, 0.1f) - 0.1f,
-               -round_tof(state.cam.y, 0.1f) - 0.1f };
-  Vec2 max = { min.x + state.zoom * aspect + 0.3f ,
-               min.y + state.zoom          + 0.3f };
+  Vec2 min = { -round_tof(state.cam.x, 0.1f) - 3.0f,
+               -round_tof(state.cam.y, 0.1f) - 3.0f };
+  Vec2 max = { min.x + state.zoom * aspect   + 3.0f + 0.2f,
+               min.y + state.zoom            + 3.0f + 0.2f};
 
   for (  float x = min.x+0.05f; x < max.x; x += 0.1f)
     for (float y = min.y+0.05f; y < max.y; y += 0.1f) {
-      float size = 0.10f * fabsf(stb_perlin_fbm_noise3(x,y,0.0f, 2,0.5f,6));
-      geo_rect(&geo, COLOR_TREEBORDER, -0.1f, x,y, size,size);
+      int ix = x/0.1f;
+      int iy = y/0.1f;
+
+      float gpn = fabsf(stb_perlin_fbm_noise3(x*0.4f,y*0.4f,0.0f, 2,0.5f,6))*3;
+      gpn = fminf(gpn, 2.0f);
+      // geo_rect(&geo, COLOR_GRASS_TOP, y, x,y, size,size);
+      Color c = COLOR_GRASS_TOP;
+      float gx = (iy%2) ? x + 0.05f : x;
+      float gy = y;
+      geo_tri(&geo, (Vert) { .color=c, .z=y, .pos={ gx-0.01f*gpn, gy           } },
+                    (Vert) { .color=c, .z=y, .pos={ gx+0.01f*gpn, gy           } },
+                    (Vert) { .color=c, .z=y, .pos={ gx           , gy+0.09f*gpn } });
+
+      if ((ix % 8) == 0 &&
+          (iy % 8) == 0 ) {
+        float size = fabsf(stb_perlin_fbm_noise3(x*0.1f,y*0.1f,0.0f, 2,0.5f,6));
+        if (size > 0.35f)
+          geo_tree(&geo, ix*0.1f+gpn*0.1f,
+                         iy*0.1f+gpn*0.8f, fminf(0.42f, (size-0.30f)*4.0f));
+      }
     }
 
   geo_apply_cam(&geo, width, height);
+
+  geo_rect(&geo, COLOR_GRASS_BOTTOM, 0.99f, -0.0f,-0.0f, 2.0f,2.0f);
 }
