@@ -9,6 +9,8 @@ static float round_tof(float x, float n) { return n * (int)(x/n); }
 
 #define STB_PERLIN_IMPLEMENTATION
 #include "stb_perlin.h"
+typedef struct { float x, y, z; } Vec3;
+#include "man.h"
 
 #define WASM_EXPORT __attribute__((visibility("default")))
 extern float cosf(float);
@@ -60,7 +62,7 @@ WASM_EXPORT Color color_picked = { 0.0f, 0.0f, 0.0f, 1.0f };
 #define COLOR_TREEGREEN1    ((Color) { 0.04f, 0.50f, 0.21f, 1.00f })
 #define COLOR_TREEGREEN2    ((Color) { 0.08f, 0.54f, 0.25f, 1.00f })
 #define COLOR_TREEGREEN3    ((Color) { 0.12f, 0.58f, 0.29f, 1.00f })
-#define COLOR_BARK          ((Color) { 0.37f, 0.32f, 0.29f, 1.00f })
+#define COLOR_BARK          ((Color) { 0.33f, 0.24f, 0.16f, 1.00f })
 #define COLOR_GRASS_TOP     ((Color) { 0.15f, 0.61f, 0.33f, 1.00f })
 #define COLOR_FORESTSHADOW  ((Color) { 0.01f, 0.46f, 0.27f, 1.00f })
 #define COLOR_GRASS_BOTTOM  ((Color) { 0.05f, 0.51f, 0.29f, 1.00f })
@@ -81,6 +83,8 @@ static struct {
   } drag;
 
   Vec2 cam;
+
+  ManFrames mf;
 } state = {0};
 
 /* a collection of geometry (vertices, indices) you can write into */
@@ -291,6 +295,8 @@ WASM_EXPORT void mouse(MouseEventKind mouse_event_kind, int x, int y) {
 }
 
 WASM_EXPORT void zoom(int x, int y, float delta_pixels) {
+  man_frames_fill(&state.mf);
+
   float t = 1.0f - delta_pixels / fmaxf(state.width, state.height);
   #define X_SIZE (state.zoom * (float)state. width)
   #define Y_SIZE (state.zoom * (float)state.height)
@@ -310,6 +316,24 @@ WASM_EXPORT void zoom(int x, int y, float delta_pixels) {
 
   #undef X_SIZE
   #undef Y_SIZE
+}
+
+static float lerp(float a, float b, float t) {
+  return (1.0f-t)*a+t*b;
+}
+
+static Vec2 man_pos(ManPartKind mpk, float dt) {
+  float q = dt * 0.005f;
+
+  float t = q - round_tof(q, 1.0f);
+  int i = (int)q  % ARR_LEN(state.mf.frames);
+  int n = (i + 1) % ARR_LEN(state.mf.frames);
+  Vec3 a = state.mf.frames[i].pos[mpk];
+  Vec3 b = state.mf.frames[n].pos[mpk];
+  return (Vec2) {
+    lerp(a.y, b.y, t),
+    lerp(a.z, b.z, t)
+  };
 }
 
 WASM_EXPORT void frame(int width, int height, float dt) {
@@ -332,10 +356,35 @@ WASM_EXPORT void frame(int width, int height, float dt) {
   // geo_rect(&geo, COLOR_RED  , -0.2f, 0.0f,0.0f, 0.2f,0.2f);
   // geo_rect(&geo, COLOR_BLUE , -0.3f, 0.2f,0.2f, 0.2f,0.2f);
 
-  Vec2 min = { -round_tof(state.cam.x, 0.1f) - 3.0f,
-               -round_tof(state.cam.y, 0.1f) - 3.0f };
-  Vec2 max = { min.x + state.zoom * aspect   + 3.0f + 0.2f,
-               min.y + state.zoom            + 3.0f + 0.2f};
+  Vec2 head = man_pos(ManPartKind_Head, dt);
+  geo_8gon(&geo, COLOR_BLUE, -1.0f, head.x, head.y, 0.14f);
+  
+  typedef struct { ManPartKind lhs, rhs; } PartPair;
+  PartPair pp[] = {
+    { ManPartKind_Neck,    ManPartKind_Pelvis },
+    { ManPartKind_Neck,    ManPartKind_Elbow_R },
+    { ManPartKind_Neck,    ManPartKind_Elbow_L },
+    { ManPartKind_Elbow_R, ManPartKind_Hand_R },
+    { ManPartKind_Elbow_L, ManPartKind_Hand_L },
+    { ManPartKind_Pelvis,  ManPartKind_Knee_R },
+    { ManPartKind_Pelvis,  ManPartKind_Knee_L },
+    { ManPartKind_Knee_R,  ManPartKind_Sole_R  },
+    { ManPartKind_Knee_L,  ManPartKind_Sole_L  },
+    { ManPartKind_Sole_R,  ManPartKind_Toe_R  },
+    { ManPartKind_Sole_L,  ManPartKind_Toe_L  },
+  };
+
+  for (int i = 0; i < ARR_LEN(pp); i++)
+    geo_line(&geo, COLOR_BLUE, -1.0f,
+      man_pos(pp[i].lhs, dt),
+      man_pos(pp[i].rhs, dt),
+      0.02f);
+    
+
+  Vec2 min = { -round_tof(state.cam.x, 0.1f) - 3.5f,
+               -round_tof(state.cam.y, 0.1f) - 3.5f };
+  Vec2 max = { min.x + state.zoom * aspect   + 5.0f + 0.2f,
+               min.y + state.zoom            + 3.5f + 0.2f};
 
   for (  float x = min.x+0.05f; x < max.x; x += 0.1f)
     for (float y = min.y+0.05f; y < max.y; y += 0.1f) {
