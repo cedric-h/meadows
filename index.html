@@ -147,6 +147,7 @@ function createIbuf(icount) {
       cosf: Math.cos,
       sinf: Math.sin,
       sqrtf: Math.sqrt,
+      atan2f: Math.atan2,
     } });
   const wasm = instance.exports;
   mem = wasm.memory.buffer;
@@ -173,6 +174,9 @@ function createIbuf(icount) {
   window.onmouseup   = e => wasm.mouse(1, e.pageX, e.pageY);
   window.onmousemove = e => wasm.mouse(2, e.pageX, e.pageY);
 
+  window.onkeydown = e => wasm.key(1, e.key.charCodeAt(0));
+  window.onkeyup   = e => wasm.key(0, e.key.charCodeAt(0));
+
   function wheelHandler(e) {
     if (e.deltaMode != WheelEvent.DOM_DELTA_PIXEL) {
       console.error("ew. gross. im not handling this non-pixel scroll");
@@ -184,12 +188,17 @@ function createIbuf(icount) {
   }
   window.addEventListener('wheel', wheelHandler, { passive: false });
 
+  let last;
   requestAnimationFrame(function frame(time) {
+    last ??= time;
+    const dt = time - last;
+    last = time;
+
     gl.clearColor( 0.44, 0.58, 0.18, 1.00 );
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.enable(gl.DEPTH_TEST);
 
-    wasm.frame(canvas.width, canvas.height, time);
+    wasm.frame(canvas.width, canvas.height, Math.min(16*5, Math.max(0, dt)));
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, vbuf);
     gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, ibuf);
 

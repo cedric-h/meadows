@@ -7,6 +7,17 @@
 #define abs(n) (((n) < 0) ? -(n) : (n))
 
 static float round_tof(float x, float n) { return n * (int)(x/n); }
+static float fmodf(float x, float n) { return x - n * (int)(x/n); }
+static float lerp_rad(float a, float b, float t) {
+  float difference = fmodf(b - a, M_PI*2.0f),
+        distance = fmodf(2.0f * difference, M_PI*2.0f) - difference;
+  return a + distance * t;
+}
+static float lerp_round(float max, float a, float b, float t) {
+  float difference = fmodf(b - a, max),
+        distance = fmodf(2.0f * difference, max) - difference;
+  return a + distance * t;
+}
 
 #define STB_PERLIN_IMPLEMENTATION
 #include "stb_perlin.h"
@@ -18,6 +29,7 @@ extern float cosf(float);
 extern float sinf(float);
 extern float sqrtf(float);
 extern float printf(float);
+extern float atan2f(float, float);
 extern void vbuf(void *ptr, int len);
 extern void ibuf(void *ptr, int len);
 
@@ -35,6 +47,77 @@ static Vec2 vec2_pivot(Vec2 o, Vec2 v, float rads) {
     .x = o.x + oldX * cosf(rads) - oldY * sinf(rads),
     .y = o.y + oldX * sinf(rads) + oldY * cosf(rads) 
   };
+}
+static Vec2 add2(Vec2 a, Vec2 b) { return (Vec2) { a.x + b.x,
+                                                   a.y + b.y, }; }
+static Vec2 mul2_f(Vec2 a, float f) { return (Vec2) { a.x * f,
+                                                      a.y * f, }; }
+static Vec2 div2_f(Vec2 a, float f) { return (Vec2) { a.x / f,
+                                                      a.y / f, }; }
+static float dot2(Vec2 a, Vec2 b) { return a.x*b.x + a.y*b.y; }
+static float mag2(Vec2 v) { return sqrtf(dot2(v, v)); }
+static Vec2 norm2(Vec2 v) { return div2_f(v, mag2(v)); }
+
+typedef union {
+  Vec3 xyz;
+  struct { float x, y, z, w; };
+  float nums[4];
+} Vec4;
+
+static Vec3 add3(Vec3 a, Vec3 b) { return (Vec3) { a.x + b.x,
+                                                   a.y + b.y,
+                                                   a.z + b.z, }; }
+static Vec3 sub3(Vec3 a, Vec3 b) { return (Vec3) { a.x - b.x,
+                                                   a.y - b.y,
+                                                   a.z - b.z, }; }
+static Vec3 mul3_f(Vec3 a, float f) { return (Vec3) { a.x * f,
+                                                      a.y * f,
+                                                      a.z * f, }; }
+static Vec3 div3_f(Vec3 a, float f) { return (Vec3) { a.x / f,
+                                                      a.y / f,
+                                                      a.z / f, }; }
+static float dot3(Vec3 a, Vec3 b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
+static float mag3(Vec3 v) { return sqrtf(dot3(v, v)); }
+static Vec3 norm3(Vec3 v) { return div3_f(v, mag3(v)); }
+static Vec3 cross3(Vec3 a, Vec3 b) {
+  return (Vec3){(a.y * b.z) - (a.z * b.y),
+                (a.z * b.x) - (a.x * b.z),
+                (a.x * b.y) - (a.y * b.x)};
+}
+
+typedef struct { float nums[4][4]; } Mat4;
+
+static Mat4 look_at4x4(Vec3 eye, Vec3 focus, Vec3 up) {
+  Vec3 eye_dir = sub3(focus, eye);
+  Vec3 R2 = norm3(eye_dir);
+
+  Vec3 R0 = norm3(cross3(up, R2));
+  Vec3 R1 = cross3(R2, R0);
+
+  Vec3 neg_eye = mul3_f(eye, -1.0f);
+
+  float D0 = dot3(R0, neg_eye);
+  float D1 = dot3(R1, neg_eye);
+  float D2 = dot3(R2, neg_eye);
+
+  return (Mat4) {{
+    { R0.x, R1.x, R2.x, 0.0f },
+    { R0.y, R1.y, R2.y, 0.0f },
+    { R0.z, R1.z, R2.z, 0.0f },
+    {   D0,   D1,   D2, 1.0f }
+  }};
+}
+
+static Vec4 mul4x44(Mat4 m, Vec4 v) {
+  Vec4 res;
+  for(int x = 0; x < 4; ++x) {
+    float sum = 0;
+    for(int y = 0; y < 4; ++y)
+      sum += m.nums[y][x] * v.nums[y];
+
+    res.nums[x] = sum;
+  }
+  return res;
 }
 
 typedef struct { float r, g, b, a; } Color;
@@ -84,6 +167,8 @@ static struct {
   } drag;
 
   Vec2 cam;
+
+  uint8_t keys_down[255];
 
   ManFrames mf;
 } state = {0};
@@ -265,25 +350,56 @@ WASM_EXPORT void init(void) {
   man_frames_fill(&state.mf);
   typedef struct { ManPartKind lhs, rhs; } PartPair;
   PartPair mirror[] = {
-  //{ ManPartKind_Elbow_L, ManPartKind_Elbow_R },
-  //{ ManPartKind_Hand_L , ManPartKind_Hand_R  },
     { ManPartKind_Knee_L , ManPartKind_Knee_R  },
     { ManPartKind_Sole_L , ManPartKind_Sole_R  },
-    { ManPartKind_Toe_L  , ManPartKind_Toe_R   }
+    { ManPartKind_Toe_L  , ManPartKind_Toe_R   },
+    { ManPartKind_Elbow_L, ManPartKind_Elbow_R },
+    { ManPartKind_Hand_L , ManPartKind_Hand_R  },
+  };
+  ManPartKind no[] = {
+    ManPartKind_Elbow_L, ManPartKind_Elbow_R,
+    ManPartKind_Hand_L , ManPartKind_Hand_R ,
   };
 
   state.mf.frames[5] = state.mf.frames[1];
   state.mf.frames[6] = state.mf.frames[2];
   state.mf.frames[7] = state.mf.frames[3];
 
+  // for (int i = 0; i < ARR_LEN(no); i++) {
+  //   ManPartKind mpk = no[i];
+  //   state.mf.frames[5].pos[mpk] = state.mf.frames[1].pos[mpk];
+  //   state.mf.frames[6].pos[mpk] = state.mf.frames[2].pos[mpk];
+  //   state.mf.frames[7].pos[mpk] = state.mf.frames[3].pos[mpk];
+  //   state.mf.frames[8].pos[mpk] = state.mf.frames[0].pos[mpk];
+  // }
+
+  /* pull arms in */
+  for (int j = 0; j < ManPartKind_COUNT; j++)
+    for (int i = 0; i < ARR_LEN(no); i++) {
+      ManPartKind n = no[i];
+      state.mf.frames[j].pos[n].x *= 0.8f;
+    }
+
+  /* mirror animation data for other leg */
   for (int j = 0; j < 3; j++) {
     for (int i = 0; i < ARR_LEN(mirror); i++) {
       ManPartKind lhs = mirror[i].lhs;
       ManPartKind rhs = mirror[i].rhs;
-      state.mf.frames[5+j].pos[lhs].y = state.mf.frames[1+j].pos[rhs].y;
-      state.mf.frames[5+j].pos[lhs].z = state.mf.frames[1+j].pos[rhs].z;
-      state.mf.frames[5+j].pos[rhs].y = state.mf.frames[1+j].pos[lhs].y;
-      state.mf.frames[5+j].pos[rhs].z = state.mf.frames[1+j].pos[lhs].z;
+      state.mf.frames[5+j].pos[lhs].y =  state.mf.frames[1+j].pos[rhs].y;
+      state.mf.frames[5+j].pos[lhs].z =  state.mf.frames[1+j].pos[rhs].z;
+      state.mf.frames[5+j].pos[rhs].y =  state.mf.frames[1+j].pos[lhs].y;
+      state.mf.frames[5+j].pos[rhs].z =  state.mf.frames[1+j].pos[lhs].z;
+    }
+  }
+
+  /* pull arm anims toward neck in Y */
+  for (int j = 0; j < ManPartKind_COUNT; j++) {
+    for (int i = 0; i < ARR_LEN(no); i++) {
+      ManPartKind n = no[i];
+      float center = state.mf.frames[j].pos[ManPartKind_Neck].y;
+      state.mf.frames[j].pos[n].y -= center;
+      state.mf.frames[j].pos[n].y *= 0.35f;
+      state.mf.frames[j].pos[n].y += center;
     }
   }
 }
@@ -320,6 +436,10 @@ WASM_EXPORT void mouse(MouseEventKind mouse_event_kind, int x, int y) {
   }
 }
 
+WASM_EXPORT void key(uint8_t down, char key) {
+  state.keys_down[(int)key] = down;
+}
+
 WASM_EXPORT void zoom(int x, int y, float delta_pixels) {
   float t = 1.0f - delta_pixels / fmaxf(state.width, state.height);
   #define X_SIZE (state.zoom * (float)state. width)
@@ -345,24 +465,76 @@ static float lerp(float a, float b, float t) {
   return (1.0f-t)*a+t*b;
 }
 
-static Vec2 man_pos(ManPartKind mpk, float dt) {
-  float q = dt * 0.005f;
+typedef struct {
+  Vec2 pos;
+  float anim_prog;
+  float dir;
+} Man;
 
+static Vec2 man_pos(Man *man, ManPartKind mpk) {
+  float q = man->anim_prog;
   float t = q - round_tof(q, 1.0f);
 
   int len = ARR_LEN(state.mf.frames);
-  int i = (int) q    % len;
-  int n = (int)(q+1) % len;
+  int i = (int)(q+0  ) % len;
+  int n = (int)(q+0+1) % len;
 
   Vec3 a = state.mf.frames[i].pos[mpk];
   Vec3 b = state.mf.frames[n].pos[mpk];
-  return (Vec2) {
-    lerp(a.y, b.y, t) * 0.5f,
-    lerp(a.z, b.z, t) * 0.5f
+  Vec4 p = { .x = lerp(a.x, b.x, t) * 1.35f,
+             .y = lerp(a.y, b.y, t),
+             .z = lerp(a.z, b.z, t),
+             .w = 1.0f };
+
+  float mx = cosf(man->dir);
+  float my = sinf(man->dir);
+  Mat4 m = look_at4x4((Vec3) { mx, my, 0.75f },
+                      (Vec3) {  0,  0, 0     },
+                      (Vec3) {  0,  0, 1     });
+  p = mul4x44(m, p);
+  return (Vec2) { p.x * 0.5f + man->pos.x,
+                  p.y * 0.5f + man->pos.y };
+}
+
+static void geo_man(Geo *geo, Man *man) {
+  Color skin_color = { 0.2f, 0.25f, 0.43f, 1.0f };
+
+  float z = man_pos(man, ManPartKind_Toe_R).y - 0.1f;
+
+  Vec2 head = man_pos(man, ManPartKind_Head);
+  geo_ngon(geo, skin_color, z, head.x, head.y, 0.08f, 32);
+
+  typedef struct { ManPartKind lhs, rhs; } PartPair;
+  PartPair pp[] = {
+    { ManPartKind_Neck,    ManPartKind_Pelvis  },
+    { ManPartKind_Neck,    ManPartKind_Elbow_R },
+    { ManPartKind_Neck,    ManPartKind_Elbow_L },
+    { ManPartKind_Elbow_R, ManPartKind_Hand_R  },
+    { ManPartKind_Elbow_L, ManPartKind_Hand_L  },
+    { ManPartKind_Pelvis,  ManPartKind_Knee_R  },
+    { ManPartKind_Pelvis,  ManPartKind_Knee_L  },
+    { ManPartKind_Knee_R,  ManPartKind_Sole_R  },
+    { ManPartKind_Knee_L,  ManPartKind_Sole_L  },
+    { ManPartKind_Sole_R,  ManPartKind_Toe_R   },
+    { ManPartKind_Sole_L,  ManPartKind_Toe_L   },
   };
+
+  float thickness = 0.0125f;
+  for (ManPartKind i = 0; i < ManPartKind_COUNT; i++) {
+    Vec2 pos = man_pos(man, i);
+    geo_8gon(geo, skin_color, z, pos.x, pos.y, thickness);
+  }
+
+  for (int i = 0; i < ARR_LEN(pp); i++)
+    geo_line(geo, skin_color, z,
+      man_pos(man, pp[i].lhs),
+      man_pos(man, pp[i].rhs),
+      thickness*2.0f);
 }
 
 WASM_EXPORT void frame(int width, int height, float dt) {
+  dt /= 1000.0f/60.0f;
+
   state. width =  width;
   state.height = height;
 
@@ -382,42 +554,52 @@ WASM_EXPORT void frame(int width, int height, float dt) {
   // geo_rect(&geo, COLOR_RED  , -0.2f, 0.0f,0.0f, 0.2f,0.2f);
   // geo_rect(&geo, COLOR_BLUE , -0.3f, 0.2f,0.2f, 0.2f,0.2f);
 
-  Color skin_color = { 0.2f, 0.25f, 0.43f, 1.0f };
+  static Vec2 pos, vel;
+  Vec2 move = {};
+  if (state.keys_down['w']) move.y += 1;
+  if (state.keys_down['s']) move.y -= 1;
+  if (state.keys_down['a']) move.x -= 1;
+  if (state.keys_down['d']) move.x += 1;
+  if (dot2(move, move) > 0.0f) move = norm2(move);
+  vel = add2(vel, mul2_f(move, 0.002f));
+  vel = mul2_f(vel, 0.85f);
+  if (dot2(vel, vel) > 0.00008f)
+    pos = add2(pos, vel);
 
-  Vec2 head = man_pos(ManPartKind_Head, dt);
-  geo_ngon(&geo, skin_color, -1.0f, head.x, head.y, 0.085f, 16);
+  static float anim_damp = 0.0f, anim_prog = 0.0f;
+  uint8_t going = dot2(vel, vel) > 0.00001f;
+  anim_damp = lerp(anim_damp, going, dt * 0.15f);
+  anim_prog += 0.14f*anim_damp*dt;
+  int anim_len = ARR_LEN(state.mf.frames);
+  anim_prog = lerp_round(anim_len, anim_prog, going*anim_prog, dt*0.05f); 
+  anim_prog = fmodf(anim_prog, anim_len);
 
-  typedef struct { ManPartKind lhs, rhs; } PartPair;
-  PartPair pp[] = {
-    { ManPartKind_Neck,    ManPartKind_Pelvis  },
-    { ManPartKind_Neck,    ManPartKind_Elbow_R },
-    { ManPartKind_Neck,    ManPartKind_Elbow_L },
-    { ManPartKind_Elbow_R, ManPartKind_Hand_R  },
-    { ManPartKind_Elbow_L, ManPartKind_Hand_L  },
-    { ManPartKind_Pelvis,  ManPartKind_Knee_R  },
-    { ManPartKind_Pelvis,  ManPartKind_Knee_L  },
-    { ManPartKind_Knee_R,  ManPartKind_Sole_R  },
-    { ManPartKind_Knee_L,  ManPartKind_Sole_L  },
-    { ManPartKind_Sole_R,  ManPartKind_Toe_R   },
-    { ManPartKind_Sole_L,  ManPartKind_Toe_L   },
+  static float dir = 0.0f;
+  dir = lerp_rad(dir, atan2f(-vel.y, -vel.x), going*dt*0.1f);
+
+  Man man = {
+    .pos = pos,
+    .anim_prog = anim_prog,
+    .dir = dir,
   };
+  geo_man(&geo, &man);
 
-  for (ManPartKind i = 0; i < ManPartKind_COUNT; i++) {
-    Vec2 pos = man_pos(i, dt);
-    geo_8gon(&geo, skin_color, -1.0f, pos.x, pos.y, 0.01f);
-  }
+  Vec2 halsc = px_to_world_space(
+    (state.zoom * (float)state. width)/2.0f,
+    (state.zoom * (float)state.height)/2.0f
+  );
+  state.cam = (Vec2) { lerp(state.cam.x, -pos.x + halsc.x, dt*0.04f),
+                       lerp(state.cam.y, -pos.y + halsc.y, dt*0.04f) };
 
-  for (int i = 0; i < ARR_LEN(pp); i++)
-    geo_line(&geo, skin_color, -1.0f,
-      man_pos(pp[i].lhs, dt),
-      man_pos(pp[i].rhs, dt),
-      0.02f);
+  // geo_man(&geo, dt, 0.3f*cosf(dt*0.001f+M_PI/2),
+  //                   0.3f*sinf(dt*0.001f+M_PI/2));
     
 
-  Vec2 min = { -round_tof(state.cam.x, 0.1f) - 3.5f,
-               -round_tof(state.cam.y, 0.1f) - 3.5f };
-  Vec2 max = { min.x + state.zoom * aspect   + 5.0f + 0.2f,
-               min.y + state.zoom            + 3.5f + 0.2f};
+  float pad = 2.0f;
+  Vec2 min = { -round_tof(state.cam.x, 0.1f) - pad,
+               -round_tof(state.cam.y, 0.1f) - pad   - 2.0f };
+  Vec2 max = { min.x + state.zoom * aspect   + pad*2,
+               min.y + state.zoom            + pad*2 + 4.0f};
 
   for (  float x = min.x+0.05f; x < max.x; x += 0.1f)
     for (float y = min.y+0.05f; y < max.y; y += 0.1f) {

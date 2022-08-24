@@ -9,6 +9,7 @@ cd build
 clang \
   --target=wasm32 \
   -O3 \
+  -g \
   -fvisibility=default \
   -flto \
   -nostdlib \

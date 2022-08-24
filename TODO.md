@@ -52,8 +52,22 @@ npc <-> player dialogues
 
 omg omg character selection/equipment :scream:
 
+chat!?!
+
 graphics enhancements:
   - MSAA
   - bloom
 
 eventually, we'll want things to persist: database, signup flow, all that good shit?
+
+
+specific art improvements:
+- shadows for stick fig
+- fix arms in walking anim
+- darken some in stick fig for 3D?
+- make grass sway, overlap
+- higher freq perlin for grass color
+
+art shit you can tweak:
+- "height" of "3D camera" for stick man
+- "chonkiness" of stick man
