@@ -80,6 +80,9 @@ static Vec3 mul3_f(Vec3 a, float f) { return (Vec3) { a.x * f,
 static Vec3 div3_f(Vec3 a, float f) { return (Vec3) { a.x / f,
                                                       a.y / f,
                                                       a.z / f, }; }
+static Vec3 lerp3(Vec3 a, Vec3 b, float t) {
+  return add3(mul3_f(a, 1.0f - t), mul3_f(b, t));
+}
 static float dot3(Vec3 a, Vec3 b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
 static float mag3(Vec3 v) { return sqrtf(dot3(v, v)); }
 static Vec3 norm3(Vec3 v) { return div3_f(v, mag3(v)); }
@@ -566,8 +569,16 @@ static Vec2 man_pos(Man *man, ManPartKind mpk) {
                   p.y * 0.5f + man->pos.y };
 }
 
-static void geo_man(Geo *geo, Man *man) {
-  Color skin_color = { 0.2f, 0.25f, 0.43f, 1.0f };
+static void geo_man(Geo *geo, Man *man, uint32_t id) {
+  Vec3 skin_color3 = lerp3(
+    (Vec3) { 0.20f, 0.25f, 0.43f },
+    (Vec3) { 0.26f, 0.19f, 0.43f },
+    (float)id/(float)(UINT32_MAX));
+  Color skin_color = {
+    .r = skin_color3.x,
+    .g = skin_color3.y,
+    .b = skin_color3.z,
+  };
 
   float z = man_pos(man, ManPartKind_Toe_R).y - 0.1f;
 
@@ -650,7 +661,7 @@ WASM_EXPORT void frame(int width, int height, double _dt) {
                                        0.01f*state.player.man.anim_damp));
 
   man_anim(&state.player.man, dt, state.player.vel);
-  geo_man(&geo, &state.player.man);
+  geo_man(&geo, &state.player.man, state.id);
 
   {
     static Man pacing_man = {0};
@@ -665,13 +676,13 @@ WASM_EXPORT void frame(int width, int height, double _dt) {
     pacing_man.pos = pos;
     man_anim(&pacing_man, dt, vel);
 
-    geo_man(&geo, &pacing_man);
+    geo_man(&geo, &pacing_man, 0);
   }
 
   for (int i = 0; i < ARR_LEN(state.others); i++) {
     Other *other = state.others + i;
     if (other->id)
-      geo_man(&geo, &other->man);
+      geo_man(&geo, &other->man, other->id);
   }
 
   /* lerp cam towards player */
