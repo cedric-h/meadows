@@ -22,7 +22,7 @@ clang \
   -Wall \
   -mbulk-memory \
   -o main.wasm \
-  ../main.c
+  ../../main.c
 
 # ../wasm_sourcemap.py \
 #   main.wasm \

@@ -31,19 +31,19 @@ typedef struct { float x, y, z; } Vec3;
 #define WASM_EXPORT __attribute__((visibility("default")))
 extern float cosf(float);
 extern float sinf(float);
+extern float randf(void);
 extern float sqrtf(float);
 extern float printf(float);
 extern float atan2f(float, float);
-extern void vbuf(void *ptr, int len);
-extern void ibuf(void *ptr, int len);
+extern void   vbuf(void *ptr, int len);
+extern void   ibuf(void *ptr, int len);
+extern void netbuf(void *ptr, int len);
+extern void netout(void *ptr, int len);
 
 static float fmaxf(float a, float b) { return (a > b) ? a : b; }
 static float fminf(float a, float b) { return (a < b) ? a : b; }
 
 typedef struct { float x, y; } Vec2;
-static Vec2 vec2_unit_from_rads(float rads) {
-  return (Vec2) { .x = cosf(rads), .y = sinf(rads) };
-}
 static Vec2 vec2_pivot(Vec2 o, Vec2 v, float rads) {
   float oldX = v.x - o.x;
   float oldY = v.y - o.y;
@@ -163,29 +163,44 @@ typedef struct {
   float dir;
 } Man;
 
+typedef struct {
+  uint32_t id;
+  Man man; /* probably needa couple to tween */
+
+  /* maybe last time we got an update about this person?
+   * so we can garbage collect? (when we actually filter by location) */
+} Other;
+
+typedef struct {
+  uint32_t id;
+  Man man;
+} NetMsg;
+
 static struct {
+
+  /* graphics */
   Vert vbuf[1 << 16];
   uint16_t ibuf[1 << 17];
-
   int width, height;
   float zoom;
+  Vec2 cam;
+  ManFrames mf;
 
+  /* networking */
+  uint8_t netbuf[1 << 8];
+  Other others[20];
+  uint32_t id;
+  float time_since_netout;
+
+  /* input */
   struct {
     uint8_t active;
     struct { int x, y; } mouse_start;
     struct { float x, y; } cam_start;
   } drag;
-
-  struct {
-    Vec2 vel;
-    Man man;
-  } player;
-
-  Vec2 cam;
-
   uint8_t keys_down[255];
+  struct { Vec2 vel; Man man; } player;
 
-  ManFrames mf;
 } state = {0};
 
 /* a collection of geometry (vertices, indices) you can write into */
@@ -357,7 +372,45 @@ static void geo_tree(Geo *geo, float x, float _y, float size) {
     v->    z += (size - 1.0f) * (v->    z - _y);
 }
 
+WASM_EXPORT void netinit(void) {
+  // float f = 42.001337f;
+  // netout(&f, sizeof(f));
+}
+
+WASM_EXPORT void netin(int len) { /* netin ... yahoo? LMFAO */
+  NetMsg *msg = (NetMsg *)state.netbuf;
+
+  /* update existing Other if we already have this ID */
+  for (int i = 0; i < ARR_LEN(state.others); i++) {
+    Other *other = state.others + i;
+
+    if (other->id == msg->id) {
+      other->man = msg->man;
+      return;
+    }
+  }
+
+  /* otherwise, allocate new Other for this ID */
+  for (int i = 0; i < ARR_LEN(state.others); i++) {
+    Other *other = state.others + i;
+
+    /* haha theres no way you randomly generated 0... right? */
+    if (other->id) continue;
+
+    other->id = msg->id;
+    other->man = msg->man;
+    return;
+  }
+}
+
+/* you can always rewrite netcode to make an existing game secure.
+ * .. what you can't do ...
+ * is get back time you spent securing a game nobody will ever play. */
+
 WASM_EXPORT void init(void) {
+  netbuf(state.netbuf, ARR_LEN(state.netbuf));
+  state.id = randf() * (float)(UINT32_MAX); // TODO: precision?
+
   state.zoom = 5.0f;
   vbuf(state.vbuf, ARR_LEN(state.vbuf));
   ibuf(state.ibuf, ARR_LEN(state.ibuf));
@@ -388,14 +441,14 @@ WASM_EXPORT void init(void) {
   //   state.mf.frames[8].pos[mpk] = state.mf.frames[0].pos[mpk];
   // }
 
-  /* pull arms in */
+  /* pull arms in (less chonky stick man) */
   for (int j = 0; j < ManPartKind_COUNT; j++)
     for (int i = 0; i < ARR_LEN(no); i++) {
       ManPartKind n = no[i];
       state.mf.frames[j].pos[n].x *= 0.8f;
     }
 
-  /* mirror animation data for other leg */
+  /* mirror animation data for other leg (only have half animation) */
   for (int j = 0; j < 3; j++) {
     for (int i = 0; i < ARR_LEN(mirror); i++) {
       ManPartKind lhs = mirror[i].lhs;
@@ -407,7 +460,7 @@ WASM_EXPORT void init(void) {
     }
   }
 
-  /* pull arm anims toward neck in Y */
+  /* pull arm anims toward neck on Y axis */
   for (int j = 0; j < ManPartKind_COUNT; j++) {
     for (int i = 0; i < ARR_LEN(no); i++) {
       ManPartKind n = no[i];
@@ -549,9 +602,19 @@ static void geo_man(Geo *geo, Man *man) {
       thickness*2.0f);
 }
 
-WASM_EXPORT void frame(int width, int height, float dt) {
-  dt /= 1000.0f/60.0f;
+WASM_EXPORT void frame(int width, int height, double _dt) {
+  float dt = _dt / (1000.0/60.0);
 
+  /* tell everyone where we are every 0.2 seconds */
+  state.time_since_netout += dt;
+  if (state.time_since_netout > 0.2f) {
+    state.time_since_netout = 0.0f;
+
+    NetMsg msg = { state.id, state.player.man };
+    netout(&msg, sizeof(msg));
+  }
+
+  /* passing this down to geo fns is annoying */
   state. width =  width;
   state.height = height;
 
@@ -605,6 +668,12 @@ WASM_EXPORT void frame(int width, int height, float dt) {
     geo_man(&geo, &pacing_man);
   }
 
+  for (int i = 0; i < ARR_LEN(state.others); i++) {
+    Other *other = state.others + i;
+    if (other->id)
+      geo_man(&geo, &other->man);
+  }
+
   /* lerp cam towards player */
   {
     Vec2 halsc = px_to_world_space(
@@ -654,4 +723,7 @@ WASM_EXPORT void frame(int width, int height, float dt) {
   geo_apply_cam(&geo, width, height);
 
   geo_rect(&geo, COLOR_GRASS_BOTTOM, 0.99f, -0.0f,-0.0f, 2.0f,2.0f);
+
+  vbuf(geo.vbuf_base, geo.vbuf - geo.vbuf_base);
+  ibuf(geo.ibuf_base, geo.ibuf - geo.ibuf_base);
 }

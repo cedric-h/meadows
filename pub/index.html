@@ -129,10 +129,11 @@ function createIbuf(icount) {
 }
 
 (async () => {
-  const wasmSrc = fetch("build/main.wasm");
 
-  let vcount, icount;
-  let vbuf, ibuf, mem;
+  const wasmSrc = fetch("build/main.wasm");
+  let vcount, icount, netcount;
+  let vbuf, ibuf, netbuf;
+  let mem, ws;
   const { instance } =
     await WebAssembly.instantiateStreaming(wasmSrc, { env: {
       vbuf: (ptr, len) => {
@@ -143,7 +144,13 @@ function createIbuf(icount) {
         icount = len;
         ibuf = new Uint16Array(mem, ptr, len);
       },
+      netbuf: (ptr, len) => {
+        netcount = len;
+        netbuf = new Uint8Array(mem, ptr, len);
+      },
+      netout: (ptr, len) => ws.send(new Uint8Array(mem, ptr, len)),
       printf: console.log,
+      randf: Math.random,
       cosf: Math.cos,
       sinf: Math.sin,
       sqrtf: Math.sqrt,
@@ -154,15 +161,20 @@ function createIbuf(icount) {
 
   wasm.init();
 
+  ws = new WebSocket(`ws://${location.host}`);
+  await new Promise(res => ws.onopen = res);
+  wasm.netinit();
+  ws.onmessage = async ({ data }) => {
+    const buf = new Uint8Array(await data.arrayBuffer());
+    netbuf.set(buf);
+    wasm.netin(buf.length);
+  };
+
   colorPickerInit(wasm);
 
   createVbuf(vcount);
   createIbuf(icount);
   gl.useProgram(program);
-
-  const ws = new WebSocket(`ws://${location.host}`);
-  ws.onopen = () => { ws.send("ur mom gay"); console.log("connected!"); }
-  ws.onmessage = console.log;
 
   (window.onresize = () => {
     // Tell WebGL how to convert from clip space to pixels
