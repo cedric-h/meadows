@@ -8,6 +8,10 @@
 
 static float round_tof(float x, float n) { return n * (int)(x/n); }
 static float fmodf(float x, float n) { return x - n * (int)(x/n); }
+
+static float lerp(float a, float b, float t) {
+  return (1.0f-t)*a+t*b;
+}
 static float lerp_rad(float a, float b, float t) {
   float difference = fmodf(b - a, M_PI*2.0f),
         distance = fmodf(2.0f * difference, M_PI*2.0f) - difference;
@@ -153,6 +157,12 @@ WASM_EXPORT Color color_picked = { 0.0f, 0.0f, 0.0f, 1.0f };
 
 typedef struct { Vec2 pos; float z, _pad0; Color color; } Vert;
 
+typedef struct {
+  Vec2 pos;
+  float anim_prog, anim_damp;
+  float dir;
+} Man;
+
 static struct {
   Vert vbuf[1 << 16];
   uint16_t ibuf[1 << 17];
@@ -165,6 +175,11 @@ static struct {
     struct { int x, y; } mouse_start;
     struct { float x, y; } cam_start;
   } drag;
+
+  struct {
+    Vec2 vel;
+    Man man;
+  } player;
 
   Vec2 cam;
 
@@ -461,15 +476,17 @@ WASM_EXPORT void zoom(int x, int y, float delta_pixels) {
   #undef Y_SIZE
 }
 
-static float lerp(float a, float b, float t) {
-  return (1.0f-t)*a+t*b;
-}
+static void man_anim(Man *man, float dt, Vec2 vel) {
+  uint8_t going = dot2(vel, vel) > 0.00001f;
+  man->anim_damp = lerp(man->anim_damp, going, dt * 0.15f);
+  man->anim_prog += 0.14f*man->anim_damp*dt;
+  int anim_len = ARR_LEN(state.mf.frames);
+  man->anim_prog = lerp_round(anim_len,
+    man->anim_prog, going*man->anim_prog, dt*0.05f); 
+  man->anim_prog = fmodf(man->anim_prog, anim_len);
 
-typedef struct {
-  Vec2 pos;
-  float anim_prog;
-  float dir;
-} Man;
+  man->dir = lerp_rad(man->dir, atan2f(-vel.y, -vel.x), going*dt*0.1f);
+}
 
 static Vec2 man_pos(Man *man, ManPartKind mpk) {
   float q = man->anim_prog;
@@ -554,42 +571,51 @@ WASM_EXPORT void frame(int width, int height, float dt) {
   // geo_rect(&geo, COLOR_RED  , -0.2f, 0.0f,0.0f, 0.2f,0.2f);
   // geo_rect(&geo, COLOR_BLUE , -0.3f, 0.2f,0.2f, 0.2f,0.2f);
 
-  static Vec2 pos, vel;
   Vec2 move = {};
   if (state.keys_down['w']) move.y += 1;
   if (state.keys_down['s']) move.y -= 1;
   if (state.keys_down['a']) move.x -= 1;
   if (state.keys_down['d']) move.x += 1;
   if (dot2(move, move) > 0.0f) move = norm2(move);
-  vel = add2(vel, mul2_f(move, 0.002f));
-  vel = mul2_f(vel, 0.85f);
-  if (dot2(vel, vel) > 0.00008f)
-    pos = add2(pos, vel);
 
-  static float anim_damp = 0.0f, anim_prog = 0.0f;
-  uint8_t going = dot2(vel, vel) > 0.00001f;
-  anim_damp = lerp(anim_damp, going, dt * 0.15f);
-  anim_prog += 0.14f*anim_damp*dt;
-  int anim_len = ARR_LEN(state.mf.frames);
-  anim_prog = lerp_round(anim_len, anim_prog, going*anim_prog, dt*0.05f); 
-  anim_prog = fmodf(anim_prog, anim_len);
+  state.player.vel = add2(state.player.vel, mul2_f(move, 0.002f));
+  state.player.vel = mul2_f(state.player.vel, 0.85f);
 
-  static float dir = 0.0f;
-  dir = lerp_rad(dir, atan2f(-vel.y, -vel.x), going*dt*0.1f);
+  if (dot2(state.player.vel, state.player.vel) > 0.00008f)
+    state.player.man.pos = add2(state.player.man.pos,
+                                mul2_f(norm2(state.player.vel),
+                                       0.01f*state.player.man.anim_damp));
 
-  Man man = {
-    .pos = pos,
-    .anim_prog = anim_prog,
-    .dir = dir,
-  };
-  geo_man(&geo, &man);
+  man_anim(&state.player.man, dt, state.player.vel);
+  geo_man(&geo, &state.player.man);
 
-  Vec2 halsc = px_to_world_space(
-    (state.zoom * (float)state. width)/2.0f,
-    (state.zoom * (float)state.height)/2.0f
-  );
-  state.cam = (Vec2) { lerp(state.cam.x, -pos.x + halsc.x, dt*0.04f),
-                       lerp(state.cam.y, -pos.y + halsc.y, dt*0.04f) };
+  {
+    static Man pacing_man = {0};
+    static float t = 0.0f;
+    t += dt;
+
+    Vec2 vel = {       cosf(t*0.01f+M_PI/2),
+                       sinf(t*0.01f+M_PI/2) };
+    Vec2 pos = { 1.00f*cosf(t*0.01f       ),
+                 1.00f*sinf(t*0.01f       ) };
+
+    pacing_man.pos = pos;
+    man_anim(&pacing_man, dt, vel);
+
+    geo_man(&geo, &pacing_man);
+  }
+
+  /* lerp cam towards player */
+  {
+    Vec2 halsc = px_to_world_space(
+      (state.zoom * (float)state. width)/2.0f,
+      (state.zoom * (float)state.height)/2.0f
+    );
+    Vec2 head = man_pos(&state.player.man, ManPartKind_Head);
+    Vec2 p = mul2_f(add2(state.player.man.pos, head), 0.5f);
+    state.cam = (Vec2) { lerp(state.cam.x, -p.x + halsc.x, dt*0.04f),
+                         lerp(state.cam.y, -p.y + halsc.y, dt*0.04f) };
+  }
 
   // geo_man(&geo, dt, 0.3f*cosf(dt*0.001f+M_PI/2),
   //                   0.3f*sinf(dt*0.001f+M_PI/2));
@@ -614,7 +640,7 @@ WASM_EXPORT void frame(int width, int height, float dt) {
       float gy = y;
       geo_tri(&geo, (Vert) { .color=c, .z=y, .pos={ gx-0.01f*gpn, gy           } },
                     (Vert) { .color=c, .z=y, .pos={ gx+0.01f*gpn, gy           } },
-                    (Vert) { .color=c, .z=y, .pos={ gx           , gy+0.09f*gpn } });
+                    (Vert) { .color=c, .z=y, .pos={ gx          , gy+0.09f*gpn } });
 
       if ((ix % 8) == 0 &&
           (iy % 8) == 0 ) {
