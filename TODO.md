@@ -40,34 +40,45 @@ origin camp:
 
 make minimap that pops out
   - show other players
+  - teleport to them!?
 
 use inventory ui from rpgc?
 
 npc <-> npc dialogues
 npc <-> player dialogues
 
-"port" central area (&MA)
+"port" central area
   - nice rolling clouds in background
   - harbor in the sky
+  - teleport from here to "worlds" 
 
 omg omg character selection/equipment :scream:
+  - wideness (shoulder to shoulder)
+  - height
+  - head size
+  - color
+  - leg to torso ratio
+  - upper limb thickness to lower limb thickness? swoleness? LMAO
 
 chat!?!
+
+eventually, we'll want things to persist: database, signup flow, all that good shit?
+
 
 graphics enhancements:
   - MSAA
   - bloom
 
-eventually, we'll want things to persist: database, signup flow, all that good shit?
-
-
 specific art improvements:
-- shadows for stick fig
-- fix arms in walking anim
-- darken some in stick fig for 3D?
-- make grass sway, overlap
-- higher freq perlin for grass color
+  stick fig:
+    - shadows for stick fig
+    - fix arms in walking anim
+    - idle anim
+    - run and walk!?!?
+    - darken some lines in stick fig for 3D?
+  nature:
+    - make grass sway, overlap
+    - vary grass color (sample higher freq perlin?)
 
 art shit you can tweak:
 - "height" of "3D camera" for stick man
-- "chonkiness" of stick man

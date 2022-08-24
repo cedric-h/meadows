@@ -1,3 +1,5 @@
+cd pub
+
 mkdir -p build
 cd build
 

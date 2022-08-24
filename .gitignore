@@ -1,1 +1,2 @@
-build/
+pub/build/
+node_modules/
