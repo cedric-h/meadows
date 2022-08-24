@@ -3,7 +3,8 @@
 
 #define M_PI 3.141592653589793
 #define GOLDEN_RATIO (1.618034f)
-#define ARR_LEN(arr) (sizeof(arr) / sizeof(arr[0]))
+#define ARR_LEN(arr) (sizeof((arr)) / sizeof((arr)[0]))
+#define abs(n) (((n) < 0) ? -(n) : (n))
 
 static float round_tof(float x, float n) { return n * (int)(x/n); }
 
@@ -180,8 +181,8 @@ static void geo_ngon(Geo *geo, Color c, float z, float x, float y, float r, floa
   geo_vbuf_push(geo, (Vert) { .pos = { x, y }, .z=z, .color = c });
 
   #define CIRC_VERT(n) ((Vert) {   \
-      .pos = { x + cosf(a*n)*r,    \
-               y + sinf(a*n)*r  }, \
+      .pos = { x + cosf(a*(n))*r,    \
+               y + sinf(a*(n))*r  }, \
       .z = z,                      \
       .color = c                   \
     })
@@ -260,6 +261,31 @@ WASM_EXPORT void init(void) {
   state.zoom = 5.0f;
   vbuf(state.vbuf, ARR_LEN(state.vbuf));
   ibuf(state.ibuf, ARR_LEN(state.ibuf));
+
+  man_frames_fill(&state.mf);
+  typedef struct { ManPartKind lhs, rhs; } PartPair;
+  PartPair mirror[] = {
+  //{ ManPartKind_Elbow_L, ManPartKind_Elbow_R },
+  //{ ManPartKind_Hand_L , ManPartKind_Hand_R  },
+    { ManPartKind_Knee_L , ManPartKind_Knee_R  },
+    { ManPartKind_Sole_L , ManPartKind_Sole_R  },
+    { ManPartKind_Toe_L  , ManPartKind_Toe_R   }
+  };
+
+  state.mf.frames[5] = state.mf.frames[1];
+  state.mf.frames[6] = state.mf.frames[2];
+  state.mf.frames[7] = state.mf.frames[3];
+
+  for (int j = 0; j < 3; j++) {
+    for (int i = 0; i < ARR_LEN(mirror); i++) {
+      ManPartKind lhs = mirror[i].lhs;
+      ManPartKind rhs = mirror[i].rhs;
+      state.mf.frames[5+j].pos[lhs].y = state.mf.frames[1+j].pos[rhs].y;
+      state.mf.frames[5+j].pos[lhs].z = state.mf.frames[1+j].pos[rhs].z;
+      state.mf.frames[5+j].pos[rhs].y = state.mf.frames[1+j].pos[lhs].y;
+      state.mf.frames[5+j].pos[rhs].z = state.mf.frames[1+j].pos[lhs].z;
+    }
+  }
 }
 
 typedef enum {
@@ -295,8 +321,6 @@ WASM_EXPORT void mouse(MouseEventKind mouse_event_kind, int x, int y) {
 }
 
 WASM_EXPORT void zoom(int x, int y, float delta_pixels) {
-  man_frames_fill(&state.mf);
-
   float t = 1.0f - delta_pixels / fmaxf(state.width, state.height);
   #define X_SIZE (state.zoom * (float)state. width)
   #define Y_SIZE (state.zoom * (float)state.height)
@@ -305,7 +329,6 @@ WASM_EXPORT void zoom(int x, int y, float delta_pixels) {
 
   /* --- apply zoom --- */
   state.zoom *= t;
-  printf(state.zoom);
 
   Vec2 p = px_to_world_space(
     (x_size_before - X_SIZE)/2.0f,
@@ -326,13 +349,16 @@ static Vec2 man_pos(ManPartKind mpk, float dt) {
   float q = dt * 0.005f;
 
   float t = q - round_tof(q, 1.0f);
-  int i = (int)q  % ARR_LEN(state.mf.frames);
-  int n = (i + 1) % ARR_LEN(state.mf.frames);
+
+  int len = ARR_LEN(state.mf.frames);
+  int i = (int) q    % len;
+  int n = (int)(q+1) % len;
+
   Vec3 a = state.mf.frames[i].pos[mpk];
   Vec3 b = state.mf.frames[n].pos[mpk];
   return (Vec2) {
-    lerp(a.y, b.y, t),
-    lerp(a.z, b.z, t)
+    lerp(a.y, b.y, t) * 0.5f,
+    lerp(a.z, b.z, t) * 0.5f
   };
 }
 
@@ -356,26 +382,33 @@ WASM_EXPORT void frame(int width, int height, float dt) {
   // geo_rect(&geo, COLOR_RED  , -0.2f, 0.0f,0.0f, 0.2f,0.2f);
   // geo_rect(&geo, COLOR_BLUE , -0.3f, 0.2f,0.2f, 0.2f,0.2f);
 
+  Color skin_color = { 0.2f, 0.25f, 0.43f, 1.0f };
+
   Vec2 head = man_pos(ManPartKind_Head, dt);
-  geo_8gon(&geo, COLOR_BLUE, -1.0f, head.x, head.y, 0.14f);
-  
+  geo_ngon(&geo, skin_color, -1.0f, head.x, head.y, 0.085f, 16);
+
   typedef struct { ManPartKind lhs, rhs; } PartPair;
   PartPair pp[] = {
-    { ManPartKind_Neck,    ManPartKind_Pelvis },
+    { ManPartKind_Neck,    ManPartKind_Pelvis  },
     { ManPartKind_Neck,    ManPartKind_Elbow_R },
     { ManPartKind_Neck,    ManPartKind_Elbow_L },
-    { ManPartKind_Elbow_R, ManPartKind_Hand_R },
-    { ManPartKind_Elbow_L, ManPartKind_Hand_L },
-    { ManPartKind_Pelvis,  ManPartKind_Knee_R },
-    { ManPartKind_Pelvis,  ManPartKind_Knee_L },
+    { ManPartKind_Elbow_R, ManPartKind_Hand_R  },
+    { ManPartKind_Elbow_L, ManPartKind_Hand_L  },
+    { ManPartKind_Pelvis,  ManPartKind_Knee_R  },
+    { ManPartKind_Pelvis,  ManPartKind_Knee_L  },
     { ManPartKind_Knee_R,  ManPartKind_Sole_R  },
     { ManPartKind_Knee_L,  ManPartKind_Sole_L  },
-    { ManPartKind_Sole_R,  ManPartKind_Toe_R  },
-    { ManPartKind_Sole_L,  ManPartKind_Toe_L  },
+    { ManPartKind_Sole_R,  ManPartKind_Toe_R   },
+    { ManPartKind_Sole_L,  ManPartKind_Toe_L   },
   };
 
+  for (ManPartKind i = 0; i < ManPartKind_COUNT; i++) {
+    Vec2 pos = man_pos(i, dt);
+    geo_8gon(&geo, skin_color, -1.0f, pos.x, pos.y, 0.01f);
+  }
+
   for (int i = 0; i < ARR_LEN(pp); i++)
-    geo_line(&geo, COLOR_BLUE, -1.0f,
+    geo_line(&geo, skin_color, -1.0f,
       man_pos(pp[i].lhs, dt),
       man_pos(pp[i].rhs, dt),
       0.02f);
