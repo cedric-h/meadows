@@ -8,6 +8,9 @@
 
 static float round_tof(float x, float n) { return n * (int)(x/n); }
 static float fmodf(float x, float n) { return x - n * (int)(x/n); }
+static float signf(float x) { return (x < 0.0f) ? -1.0f : 1.0f; }
+
+static int realmod(int x, int p) { return ((x % p) + p) % p; }
 
 static float lerp(float a, float b, float t) {
   return (1.0f-t)*a+t*b;
@@ -658,7 +661,7 @@ WASM_EXPORT void frame(int width, int height, double _dt) {
   if (dot2(state.player.vel, state.player.vel) > 0.00008f)
     state.player.man.pos = add2(state.player.man.pos,
                                 mul2_f(norm2(state.player.vel),
-                                       0.01f*state.player.man.anim_damp));
+                                       0.013f*state.player.man.anim_damp));
 
   man_anim(&state.player.man, dt, state.player.vel);
   geo_man(&geo, &state.player.man, state.id);
@@ -707,27 +710,32 @@ WASM_EXPORT void frame(int width, int height, double _dt) {
   Vec2 max = { min.x + state.zoom * aspect   + pad*2,
                min.y + state.zoom            + pad*2 + 4.0f};
 
-  for (  float x = min.x+0.05f; x < max.x; x += 0.1f)
-    for (float y = min.y+0.05f; y < max.y; y += 0.1f) {
-      int ix = x/0.1f;
-      int iy = y/0.1f;
+  for (  float _x = min.x; _x < max.x; _x += 0.1f)
+    for (float _y = min.y; _y < max.y; _y += 0.1f) {
+      /* the 0.000001f bias prevents -1.0f from getting trunced to 0 */ 
+      int ix = (_x + 0.0001f*signf(_x))/0.1f;
+      int iy = (_y + 0.0001f*signf(_y))/0.1f;
+
+      /* the 0.05f bias centers things in their tiles */
+      float x = _x + 0.05f;
+      float y = _y + 0.05f;
 
       float gpn = fabsf(stb_perlin_fbm_noise3(x*0.4f,y*0.4f,0.0f, 2,0.5f,6))*3;
       gpn = fminf(gpn, 2.0f);
       // geo_rect(&geo, COLOR_GRASS_TOP, y, x,y, size,size);
       Color c = COLOR_GRASS_TOP;
-      float gx = (iy%2) ? x + 0.05f : x;
+      float gx = realmod(iy, 2) ? x + 0.05f : x;
       float gy = y;
       geo_tri(&geo, (Vert) { .color=c, .z=y, .pos={ gx-0.01f*gpn, gy           } },
                     (Vert) { .color=c, .z=y, .pos={ gx+0.01f*gpn, gy           } },
                     (Vert) { .color=c, .z=y, .pos={ gx          , gy+0.09f*gpn } });
 
-      if ((ix % 8) == 0 &&
-          (iy % 8) == 0 ) {
+      if (realmod(ix, 8) == 0 &&
+          realmod(iy, 8) == 0 ) {
         float size = fabsf(stb_perlin_fbm_noise3(x*0.1f,y*0.1f,0.0f, 2,0.5f,6));
         if (size > 0.35f)
-          geo_tree(&geo, ix*0.1f+gpn*0.1f,
-                         iy*0.1f+gpn*0.8f, fminf(0.42f, (size-0.30f)*4.0f));
+          geo_tree(&geo, x+gpn*0.1f,
+                         y+gpn*0.8f, fminf(0.42f, (size-0.30f)*4.0f));
       }
     }
 
