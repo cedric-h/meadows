@@ -149,6 +149,8 @@ WASM_EXPORT Color color_picked = { 0.0f, 0.0f, 0.0f, 1.0f };
 #define COLOR_DARKGREY      ((Color) { 0.31f, 0.31f, 0.31f, 1.00f })
 #define COLOR_YELLOW        ((Color) { 0.99f, 0.98f, 0.00f, 1.00f })
 
+#define COLOR_TEXT          ((Color) { 0.95f, 0.75f, 0.32f, 1.00f })
+
 #define COLOR_SLOTCOLOR     ((Color) { 0.42f, 0.40f, 0.39f, 1.00f })
 #define COLOR_DARKSLOTCOLOR ((Color) { 0.32f, 0.30f, 0.29f, 1.00f })
 #define COLOR_TREEBORDER    ((Color) { 0.00f, 0.42f, 0.13f, 1.00f })
@@ -161,7 +163,7 @@ WASM_EXPORT Color color_picked = { 0.0f, 0.0f, 0.0f, 1.0f };
 #define COLOR_FORESTSHADOW  ((Color) { 0.01f, 0.46f, 0.27f, 1.00f })
 #define COLOR_GRASS_BOTTOM  ((Color) { 0.05f, 0.51f, 0.29f, 1.00f })
 
-typedef struct { Vec2 pos; float z, _pad0; Color color; } Vert;
+typedef struct { Vec2 pos; float z, letter; Color color; } Vert;
 
 typedef struct {
   Vec2 pos;
@@ -187,6 +189,7 @@ static struct {
   /* graphics */
   Vert vbuf[1 << 16];
   uint16_t ibuf[1 << 17];
+  float letter_width_buf[128];
   int width, height;
   float zoom;
   Vec2 cam;
@@ -351,6 +354,22 @@ static void geo_rect(Geo *geo, Color c, float z, float x, float y, float w, floa
                       (Vec2) { .x = x+w/2, .y = y}, h);
 }
 
+static void geo_text(Geo *geo, Color c, float z, float x, float y, char *str, float size) {
+  do {
+
+    geo_quad(geo,
+      (Vert) { .pos = { x + size, y - size }, .z=z, .color=c, .letter=*str + 0.00f },
+      (Vert) { .pos = { x       , y - size }, .z=z, .color=c, .letter=*str + 0.25f },
+      (Vert) { .pos = { x + size, y        }, .z=z, .color=c, .letter=*str + 0.50f },
+      (Vert) { .pos = { x       , y        }, .z=z, .color=c, .letter=*str + 0.75f }
+    );
+
+    x += size * state.letter_width_buf[*str];
+
+    z -= 0.00001f;
+  } while(*++str);
+}
+
 static void geo_tree(Geo *geo, float x, float _y, float size) {
   Vert *start = geo->vbuf;
   float w = 0.8f, h = GOLDEN_RATIO, r = 0.4f;
@@ -413,6 +432,7 @@ WASM_EXPORT void netin(int len) { /* netin ... yahoo? LMFAO */
  * .. what you can't do ...
  * is get back time you spent securing a game nobody will ever play. */
 
+WASM_EXPORT float *letter_width_buf(void) { return state.letter_width_buf; }
 WASM_EXPORT void init(void) {
   netbuf(state.netbuf, ARR_LEN(state.netbuf));
   state.id = randf() * (float)(UINT32_MAX); // TODO: precision?
@@ -581,6 +601,7 @@ static void geo_man(Geo *geo, Man *man, uint32_t id) {
     .r = skin_color3.x,
     .g = skin_color3.y,
     .b = skin_color3.z,
+    .a = 1.0f,
   };
 
   float z = man_pos(man, ManPartKind_Toe_R).y - 0.1f;
@@ -642,7 +663,7 @@ WASM_EXPORT void frame(int width, int height, double _dt) {
   };
   __builtin_memset(state.ibuf, 0, sizeof(state.ibuf));
 
-  float aspect = (float)width/(float)height;
+  float aspect = (float)height/(float)width;
 
   // geo_rect(&geo, COLOR_GREEN, -0.1f, 0.1f,0.1f, 0.2f,0.2f);
   // geo_rect(&geo, COLOR_RED  , -0.2f, 0.0f,0.0f, 0.2f,0.2f);
@@ -704,8 +725,8 @@ WASM_EXPORT void frame(int width, int height, double _dt) {
   //                   0.3f*sinf(dt*0.001f+M_PI/2));
     
 
-  float pad = 2.0f;
-  Vec2 min = { -round_tof(state.cam.x, 0.1f) - pad,
+  float pad = 2.5f;
+  Vec2 min = { -round_tof(state.cam.x, 0.1f) - pad   + 1.0f,
                -round_tof(state.cam.y, 0.1f) - pad   - 2.0f };
   Vec2 max = { min.x + state.zoom * aspect   + pad*2,
                min.y + state.zoom            + pad*2 + 4.0f};
@@ -739,9 +760,27 @@ WASM_EXPORT void frame(int width, int height, double _dt) {
       }
     }
 
+  // EX: adding nametag to player
+  // geo_text(&geo, COLOR_RED, state.player.man.pos.y-1.0f,
+  //                           state.player.man.pos.x,
+  //                           state.player.man.pos.y,
+  //                           "ced",
+  //                           0.1f);
+
   geo_apply_cam(&geo, width, height);
 
   geo_rect(&geo, COLOR_GRASS_BOTTOM, 0.99f, -0.0f,-0.0f, 2.0f,2.0f);
+
+  /* ghetto text-only apply_cam (just aspect correction) */
+  Vert *text_start = geo.vbuf;
+  geo_text(&geo, COLOR_TEXT,-0.99f, 0.0f, 1.0f, "be very fuckin scared", 0.03f);
+  for (Vert *t = text_start; t != geo.vbuf; t++) {
+    t->pos.x *= aspect;
+
+    // 0..1 is good actually
+    t->pos.x = t->pos.x * 2.0f - 1.0f;
+    t->pos.y = t->pos.y * 2.0f - 1.0f;
+  }
 
   vbuf(geo.vbuf_base, geo.vbuf - geo.vbuf_base);
   ibuf(geo.ibuf_base, geo.ibuf - geo.ibuf_base);
