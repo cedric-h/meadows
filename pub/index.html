@@ -244,7 +244,7 @@ function createIbuf(icount) {
         netbuf = new Uint8Array(mem, ptr, len);
       },
       netout: (ptr, len) => ws.send(new Uint8Array(mem, ptr, len)),
-      printf: console.log,
+      printff: console.log,
       randf: Math.random,
       cosf: Math.cos,
       sinf: Math.sin,
