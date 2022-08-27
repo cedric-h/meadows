@@ -725,11 +725,11 @@ WASM_EXPORT void frame(int width, int height, double _dt) {
   //                   0.3f*sinf(dt*0.001f+M_PI/2));
     
 
-  float pad = 2.5f;
-  Vec2 min = { -round_tof(state.cam.x, 0.1f) - pad   + 1.0f,
+  float pad = 1.5f;
+  Vec2 min = { -round_tof(state.cam.x, 0.1f) - pad         ,
                -round_tof(state.cam.y, 0.1f) - pad   - 2.0f };
-  Vec2 max = { min.x + state.zoom * aspect   + pad*2,
-               min.y + state.zoom            + pad*2 + 4.0f};
+  Vec2 max = { min.x + state.zoom / aspect   + pad*2,
+               min.y + state.zoom            + pad*2 + 1.0f};
 
   for (  float _x = min.x; _x < max.x; _x += 0.1f)
     for (float _y = min.y; _y < max.y; _y += 0.1f) {
@@ -754,9 +754,15 @@ WASM_EXPORT void frame(int width, int height, double _dt) {
       if (realmod(ix, 8) == 0 &&
           realmod(iy, 8) == 0 ) {
         float size = fabsf(stb_perlin_fbm_noise3(x*0.1f,y*0.1f,0.0f, 2,0.5f,6));
-        if (size > 0.35f)
+        if (size > 0.35f) {
           geo_tree(&geo, x+gpn*0.1f,
                          y+gpn*0.8f, fminf(0.42f, (size-0.30f)*4.0f));
+
+          if (realmod(ix, 8*3) == 0 &&
+              realmod(iy, 8*3) == 0 &&
+              size < 0.475f        )
+            geo_rect(&geo, COLOR_MAROON, y-10.1f, x, y, 0.1f, 0.1f);
+        }
       }
     }
 
