@@ -22,7 +22,7 @@ serve:
 	node server.js
 
 deps:
-	sudo pacman -S clang lld node npm
+	sudo pacman -S clang lld nodejs npm
 	npm install express
 
 build:
