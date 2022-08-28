@@ -1214,4 +1214,6 @@ WASM_EXPORT void frame(int width, int height, double _dt) {
 
   vbuf(geo.vbuf_base, geo.vbuf - geo.vbuf_base);
   ibuf(geo.ibuf_base, geo.ibuf - geo.ibuf_base);
+
+
 }
