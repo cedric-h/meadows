@@ -159,30 +159,36 @@ async function uploadFontImage(letterWidthBuf) {
   /* generate font image */
   const scale = 1 << 9;
 
-  document.fonts.add(await wackLoad);
-  const font = document.createElement("canvas");
-  const ctx = font.getContext("2d");
+  {
+    document.fonts.add(await wackLoad);
+    const font = document.createElement("canvas");
+    const ctx = font.getContext("2d");
 
-  font.width = font.height = scale;
-  ctx.clearRect(0, 0, scale, scale);
+    font.width = font.height = scale;
+    ctx.clearRect(0, 0, scale, scale);
 
-  ctx.fillStyle = "white";
+    ctx.fillStyle = "white";
 
-  /* so that zero-initialized letter parameters have full color */
-  ctx.fillRect(-10, -10, 10+scale/12, 10+scale/12);
+    /* so that zero-initialized letter parameters have full color */
+    ctx.fillRect(-10, -10, 10+scale/12, 10+scale/12);
 
-  const fontSize = Math.floor(scale/12);
-  ctx.textBaseline = "top";
-  ctx.font = fontSize + 'pt WackClubSans';
-  for (let i = 0; i < 128; i++) {
-    const str = String.fromCharCode(i);
-    letterWidthBuf[i] = ctx.measureText(str).width / fontSize;
-    ctx.fillText(
-      str,
-                (i % 12) / 12 * scale,
-      Math.floor(i / 12) / 12 * scale,
-    );
+    const fontSize = Math.floor(scale/12);
+    ctx.textBaseline = "top";
+    ctx.font = fontSize + 'pt WackClubSans';
+    for (let i = 0; i < 128; i++) {
+      const str = String.fromCharCode(i);
+      letterWidthBuf[i] = ctx.measureText(str).width / fontSize;
+      ctx.fillText(
+        str,
+                  (i % 12) / 12 * scale,
+        Math.floor(i / 12) / 12 * scale,
+      );
+    }
   }
+
+  const font = new Image();
+  font.src = "font.png";
+  await new Promise(res => font.onload = res);
 
   /* TODO: figure out why canvas can't gen mipmaps? */
   uploadImage(font, 0, gl.LINEAR);
