@@ -1,3 +1,4 @@
+#pragma once
 // stb_perlin.h - v0.5 - perlin noise
 // public domain single-file C implementation by Sean Barrett
 //

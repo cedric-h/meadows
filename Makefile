@@ -1,5 +1,5 @@
 OUT = pub/build/main.wasm
-SOURCE = main.c geo.c
+SOURCE = main.c geo.c gameplay.c math.c
 CC = clang
 FLAGS =   --target=wasm32 \
           -O3 \
