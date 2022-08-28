@@ -217,12 +217,23 @@ typedef enum {
   MushroomStage_Undiscovered,
   MushroomStage_Ripe,
   MushroomStage_Collected,
+  MushroomStage_Blasted,
 } MushroomStage;
 typedef struct {
   MushroomStage stage;
   Vec2 pos;
   uint32_t hash;
 } Mushroom;
+
+typedef struct {
+  Vec2 start, target;
+  double ts_fade_out, ts_spawned;
+} Fireball;
+
+typedef enum {
+  PlayerAction_Walking,
+  PlayerAction_Casting,
+} PlayerAction;
 
 static struct {
   double elapsed;
@@ -248,7 +259,13 @@ static struct {
     struct { float x, y; } cam_start;
   } drag;
   uint8_t keys_down[255];
-  struct { Vec2 vel; Man man; } player;
+  struct {
+    Vec2 vel;
+    Man man;
+    PlayerAction action;
+
+    Vec2 cast_target;
+  } player;
 
   /* ui */
   float letter_width_buf[128];
@@ -257,6 +274,7 @@ static struct {
 
   /* gameplay? */
   Mushroom mushrooms[1 << 8];
+  Fireball fireballs[1 << 6];
 
 } state = {0};
 
@@ -282,6 +300,16 @@ static void labels_push(Label new) {
     Label *l = state.labels + i;
     if (l->ts_fade_out <= state.elapsed) {
       *l = new;
+      return;
+    }
+  }
+}
+
+static void fireballs_push(Fireball new) {
+  for (int i = 0; i < ARR_LEN(state.fireballs); i++) {
+    Fireball *f = state.fireballs + i;
+    if (f->ts_fade_out <= state.elapsed) {
+      *f = new;
       return;
     }
   }
@@ -727,6 +755,42 @@ static void geo_labels(Geo *geo) {
   }
 }
 
+static float fireball_t(Fireball *f) {
+  float duration = f->ts_fade_out - f->ts_spawned;
+  return (state.elapsed - f->ts_spawned) / duration;
+}
+
+static Vec2 fireball_pos(Fireball *f) {
+  float t = fireball_t(f);
+  return (Vec2) {
+    .x = lerp(f->start.x, f->target.x, t),
+    .y = lerp(f->start.y, f->target.y, t),
+  };
+}
+
+static void geo_fireballs(Geo *geo) {
+  for (int i = 0; i < ARR_LEN(state.fireballs); i++) {
+    Fireball *f = state.fireballs + i;
+
+    if (f->ts_fade_out > state.elapsed) {
+      Vec2 pos = fireball_pos(f);
+      float t = 1 - fireball_t(f);
+      geo_8gon(geo, (Color) { 0.8f, 0.4f, 0.2f, 1.0f }, pos.y-0.1f-t*0.65f, pos.x, pos.y, 0.1f);
+    }
+  }
+}
+
+static void label_push_i(Label *l, int i, Vec2 p) {
+  l->drift = (LABEL_TEXT_SIZE * 1.1f) * 3;
+
+  l->x = p.x;
+  l->y = p.y + 0.75f;
+
+  float delay = i * 100.0f;
+  l->ts_pop_in = state.elapsed + delay;
+  l->ts_fade_out = state.elapsed + 300.0f + delay;
+  labels_push(*l);
+}
 
 #define SHOW_TODO(i, s) __builtin_memcpy(state.todo[(i)], (s), sizeof(s))
 static void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
@@ -743,22 +807,26 @@ static void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
   float pot_y = wiz.y + 0.35f;
   geo_8gon(geo, COLOR_DARKGREY, pot_y-0.25f, pot_x, pot_y, 0.25f);
 
-
   /* rest of this file is stuff that changes based on where you are in quest */
   typedef enum {
     QuestStage_Exclamation, /* waiting on player to start it */
-    QuestStage_MushPickin, /* pick up some mushies! */
-    QuestStage_Done,
+    QuestStage_MushPickin,
+    QuestStage_MushPickinDone,
+    QuestStage_MushRoastin,
+    QuestStage_MushRoastinDone,
   } QuestStage;
 
   static QuestStage stage = QuestStage_Exclamation;
   static int mushies = 0;
 
+  uint8_t near_wiz = mag2(sub2(wiz, state.player.man.pos)) < 0.8f;
+
   switch (stage) {
+
     case QuestStage_Exclamation: {
       SHOW_TODO(0, "- talk to wizard");
 
-      if (mag2(sub2(wiz, state.player.man.pos)) < 0.8f) {
+      if (near_wiz) {
         SHOW_TODO(1, "- (press E)");
 
         if (state.keys_down['e']) {
@@ -769,19 +837,8 @@ static void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
             { .msg =  "get me some shrooms!" },
           };
 
-          for (int i = 0; i < ARR_LEN(msgs); i++) {
-            Label *l = msgs + i;
-            l->drift = (LABEL_TEXT_SIZE * 1.1f) * 3;
-
-            l->x = wiz.x;
-            l->y = wiz.y + 0.75f;
-
-            float delay = i * 100.0f;
-            printff(delay);
-            l->ts_pop_in = state.elapsed + delay;
-            l->ts_fade_out = state.elapsed + 300.0f + delay;
-            labels_push(*l);
-          }
+          for (int i = 0; i < ARR_LEN(msgs); i++)
+            label_push_i(msgs + i, i, wiz);
         }
       }
 
@@ -789,6 +846,7 @@ static void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
       geo_rect(geo, COLOR_TEXT, excl_y-1.0f, wiz.x, excl_y, 0.04f, 0.2f);
 
     } break;
+
     case QuestStage_MushPickin: {
 
       SHOW_TODO(0, "- find mushrooms");
@@ -809,13 +867,76 @@ static void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
           if (state.keys_down['e']) {
             m->stage = MushroomStage_Collected;
             mushies++;
-            if (mushies > 2) stage = QuestStage_Done;
+            if (mushies > 2) stage = QuestStage_MushPickinDone;
           }
         }
       }
     } break;
-    case QuestStage_Done: {
+
+    case QuestStage_MushPickinDone: {
       SHOW_TODO(0, "report back to wiz");
+
+      if (near_wiz) {
+        SHOW_TODO(1, "- (press E)");
+
+        if (state.keys_down['e']) {
+          mushies = 0;
+          stage = QuestStage_MushRoastin;
+
+          Label msgs[] = {
+            { .msg =  "oh, this'll never do!"  },
+            { .msg = "you gotta roast 'em ..." },
+            { .msg =  "here, take this spoon"  },
+          };
+
+          for (int i = 0; i < ARR_LEN(msgs); i++)
+            label_push_i(msgs + i, i, wiz);
+        }
+      }
+    } break;
+
+    case QuestStage_MushRoastin: {
+      SHOW_TODO(0, "- roast 3 mushies");
+
+      switch (mushies) {
+        case 0: {
+          SHOW_TODO(1, "  (hold space)");
+          SHOW_TODO(2, "  (aim with WASD)");
+          SHOW_TODO(3, "  (release space)");
+          SHOW_TODO(4, "  [0/3] roasted");
+        } break;
+        case 1: SHOW_TODO(1, "  two more to cook!");     break;
+        case 2: SHOW_TODO(1, "  LAST ONE!");     break;
+      }
+
+      /* mushroom v. fireball collision */
+      for (int i = 0; onscreen_mush[i]; i++) {
+        Mushroom *m = onscreen_mush[i];
+
+        for (int i = 0; i < ARR_LEN(state.fireballs); i++) {
+          Fireball *f = state.fireballs + i;
+
+          if (f->ts_fade_out > state.elapsed) {
+            Vec2 fpos = fireball_pos(f);
+
+            // use t to stop fireballs that are still "in the air" from hitting mushies
+            // float t = fireball_t(f);
+            // if (t > 0.8f && mag2(sub2(fpos, m->pos)) < 0.2f)
+
+            if (mag2(sub2(fpos, m->pos)) < 0.2f)
+              if (m->stage == MushroomStage_Ripe ||
+                  m->stage == MushroomStage_Collected) {
+                m->stage = MushroomStage_Blasted;
+                mushies++;
+                if (mushies > 2) stage = QuestStage_MushRoastinDone;
+              }
+          }
+        }
+      }
+    } break;
+
+    case QuestStage_MushRoastinDone: {
+      SHOW_TODO(0, "good job!");
     } break;
   }
 
@@ -868,15 +989,80 @@ WASM_EXPORT void frame(int width, int height, double _dt) {
   if (state.keys_down['d']) move.x += 1;
   if (dot2(move, move) > 0.0f) move = norm2(move);
 
-  state.player.vel = add2(state.player.vel, mul2_f(move, 0.002f));
+  /* friction */
   state.player.vel = mul2_f(state.player.vel, 0.85f);
 
-  if (dot2(state.player.vel, state.player.vel) > 0.00008f)
-    state.player.man.pos = add2(state.player.man.pos,
-                                mul2_f(norm2(state.player.vel),
-                                       0.013f*state.player.man.anim_damp));
+  switch (state.player.action) {
+    case PlayerAction_Walking: {
 
-  man_anim(&state.player.man, dt, state.player.vel);
+      state.player.vel = add2(state.player.vel, mul2_f(move, 0.002f));
+
+      /* stops the player from "drifting" to a stop so much */
+      if (dot2(state.player.vel, state.player.vel) > 0.00008f) {
+        /* only adding to the pos when the anim is going is prolly weird
+         * but it looks good so like ... */
+        state.player.man.pos = add2(state.player.man.pos,
+                                    mul2_f(norm2(state.player.vel),
+                                           0.013f*state.player.man.anim_damp));
+      }
+
+      man_anim(&state.player.man, dt, state.player.vel);
+
+      if (state.keys_down[' ']) {
+        state.player.action = PlayerAction_Casting;
+        state.player.cast_target = (Vec2){0};
+      }
+    } break;
+    case PlayerAction_Casting: {
+
+      state.player.vel = add2(state.player.vel, mul2_f(move, 0.003f));
+
+      state.player.cast_target = add2(state.player.cast_target, state.player.vel);
+
+      man_anim(&state.player.man, dt, (Vec2){});
+
+      Color magic = { 0.2f, 0.64f, 0.8f, 1.0f };
+      Vec2 p = add2(state.player.cast_target, state.player.man.pos);
+      for (int u = 0; u < 5; u++) {
+        float ur = ( state.elapsed*300.0f + (float)u / 5.0f) * (M_PI*2.0f);
+        Vec2 up = {
+          p.x + cosf(ur)*0.25f,
+          p.y + sinf(ur)*0.25f
+        };
+
+        geo_8gon(&geo, magic, up.y, up.x, up.y, 0.01f);
+
+        for (int v = 0; v < 5; v++) {
+          float vr = (-state.elapsed*300.0f + (float)v / 5.0f) * (M_PI*2.0f);
+          Vec2 vp = {
+            p.x + cosf(vr)*0.25f,
+            p.y + sinf(vr)*0.25f
+          };
+
+          Color m = magic;
+          m.r -= 0.1f;
+          m.g -= 0.1f;
+          m.b -= 0.1f;
+          geo_line(&geo, m, fmaxf(up.y, vp.y), up, vp, 0.02f);
+        }
+      }
+
+      if (!state.keys_down[' ']) {
+        state.player.action = PlayerAction_Walking;
+
+        Vec2 target = p;
+        Vec2 start = add2(state.player.man.pos, (Vec2) { 0, 0.75f });
+        float dist = mag2(sub2(start, p));
+        fireballs_push((Fireball) {
+          .ts_spawned = state.elapsed,
+          .ts_fade_out = state.elapsed + fminf(50.0f, dist*30.0f),
+          .start = start,
+          .target = target,
+        });
+      }
+    } break;
+  }
+
   geo_man_id(&geo, &state.player.man, state.id);
 
   {
@@ -975,17 +1161,21 @@ WASM_EXPORT void frame(int width, int height, double _dt) {
             /* in the event of a hash collision: shroomn't */
             else if (shroom->hash != hash) { printff(500); continue; }
 
-            if (shroom->stage == MushroomStage_Collected) continue;
-
             if (onscreen_mush_i < (ARR_LEN(onscreen_mush)-1))
               onscreen_mush[onscreen_mush_i++] = shroom;
 
-            geo_rect(&geo, COLOR_MAROON, y, x, y, 0.1f, 0.1f);
+            if (shroom->stage == MushroomStage_Ripe)
+              geo_rect(&geo, COLOR_MAROON, y, x, y, 0.10f, 0.10f);
+            if (shroom->stage == MushroomStage_Collected)
+              geo_rect(&geo, COLOR_MAROON, y, x, y, 0.05f, 0.05f);
+            if (shroom->stage == MushroomStage_Blasted)
+              geo_rect(&geo, COLOR_DARKMAROON, y, x, y, 0.05f, 0.05f);
           }
         }
       }
     }
 
+  geo_fireballs(&geo);
   // printff(onscreen_mush_i);
 
   __builtin_memset(state.todo, 0, sizeof(state.todo));
