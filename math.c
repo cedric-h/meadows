@@ -1,22 +1,23 @@
 #include "math.h"
 
-static float round_tof(float x, float n) { return n * (int)(x/n); }
-static int realmod(int x, int p) { return ((x % p) + p) % p; }
+/* the blob of magh fns llvm tries to include for us add 20kb to the WASM smh */
+ float round_tof(float x, float n) { return n * (int)(x/n); }
+ int realmod(int x, int p) { return ((x % p) + p) % p; }
 
-static float lerp(float a, float b, float t) { return (1.0f-t)*a+t*b; }
+ float lerp(float a, float b, float t) { return (1.0f-t)*a+t*b; }
 /* dont tell mom its just lerp_round with tau as max */
-static float lerp_rad(float a, float b, float t) {
+ float lerp_rad(float a, float b, float t) {
     float difference = fmodf(b - a, M_PI*2.0f),
             distance = fmodf(2.0f * difference, M_PI*2.0f) - difference;
     return a + distance * t;
 }
-static float lerp_round(float max, float a, float b, float t) {
+ float lerp_round(float max, float a, float b, float t) {
     float difference = fmodf(b - a, max),
             distance = fmodf(2.0f * difference, max) - difference;
     return a + distance * t;
 }
 
-// static Vec2 vec2_pivot(Vec2 o, Vec2 v, float rads) {
+//  Vec2 vec2_pivot(Vec2 o, Vec2 v, float rads) {
 //   float oldX = v.x - o.x;
 //   float oldY = v.y - o.y;
 //   return (Vec2) {
@@ -24,37 +25,37 @@ static float lerp_round(float max, float a, float b, float t) {
 //     .y = o.y + oldX * sinf(rads) + oldY * cosf(rads)
 //   };
 // }
-static Vec2 add2(Vec2 a, Vec2 b) { return (Vec2) { a.x + b.x,
+ Vec2 add2(Vec2 a, Vec2 b) { return (Vec2) { a.x + b.x,
                                                    a.y + b.y, }; }
-static Vec2 sub2(Vec2 a, Vec2 b) { return (Vec2) { a.x - b.x,
+ Vec2 sub2(Vec2 a, Vec2 b) { return (Vec2) { a.x - b.x,
                                                    a.y - b.y, }; }
-static Vec2 mul2_f(Vec2 a, float f) { return (Vec2) { a.x * f,
+ Vec2 mul2_f(Vec2 a, float f) { return (Vec2) { a.x * f,
                                                       a.y * f, }; }
-static Vec2 div2_f(Vec2 a, float f) { return (Vec2) { a.x / f,
+ Vec2 div2_f(Vec2 a, float f) { return (Vec2) { a.x / f,
                                                       a.y / f, }; }
-static float dot2(Vec2 a, Vec2 b) { return a.x*b.x + a.y*b.y; }
-static float mag2(Vec2 v) { return sqrtf(dot2(v, v)); }
-static Vec2 norm2(Vec2 v) { return div2_f(v, mag2(v)); }
+ float dot2(Vec2 a, Vec2 b) { return a.x*b.x + a.y*b.y; }
+ float mag2(Vec2 v) { return sqrtf(dot2(v, v)); }
+ Vec2 norm2(Vec2 v) { return div2_f(v, mag2(v)); }
 
-static Vec3 add3(Vec3 a, Vec3 b) { return (Vec3) { a.x + b.x,
+ Vec3 add3(Vec3 a, Vec3 b) { return (Vec3) { a.x + b.x,
                                                    a.y + b.y,
                                                    a.z + b.z, }; }
-static Vec3 sub3(Vec3 a, Vec3 b) { return (Vec3) { a.x - b.x,
+ Vec3 sub3(Vec3 a, Vec3 b) { return (Vec3) { a.x - b.x,
                                                    a.y - b.y,
                                                    a.z - b.z, }; }
-static Vec3 mul3_f(Vec3 a, float f) { return (Vec3) { a.x * f,
+ Vec3 mul3_f(Vec3 a, float f) { return (Vec3) { a.x * f,
                                                       a.y * f,
                                                       a.z * f, }; }
-static Vec3 div3_f(Vec3 a, float f) { return (Vec3) { a.x / f,
+ Vec3 div3_f(Vec3 a, float f) { return (Vec3) { a.x / f,
                                                       a.y / f,
                                                       a.z / f, }; }
-static Vec3 lerp3(Vec3 a, Vec3 b, float t) {
+ Vec3 lerp3(Vec3 a, Vec3 b, float t) {
     return add3(mul3_f(a, 1.0f - t), mul3_f(b, t));
 }
-static float dot3(Vec3 a, Vec3 b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
-static float mag3(Vec3 v) { return sqrtf(dot3(v, v)); }
-static Vec3 norm3(Vec3 v) { return div3_f(v, mag3(v)); }
-static Vec3 cross3(Vec3 a, Vec3 b) {
+ float dot3(Vec3 a, Vec3 b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
+ float mag3(Vec3 v) { return sqrtf(dot3(v, v)); }
+ Vec3 norm3(Vec3 v) { return div3_f(v, mag3(v)); }
+ Vec3 cross3(Vec3 a, Vec3 b) {
     return (Vec3){(a.y * b.z) - (a.z * b.y),
                   (a.z * b.x) - (a.x * b.z),
                   (a.x * b.y) - (a.y * b.x)};
@@ -68,7 +69,7 @@ uint64_t fnv1_hash(void *key, int n_bytes) {
     return h;
 }
 
-static Mat4 look_at4x4(Vec3 eye, Vec3 focus, Vec3 up) {
+ Mat4 look_at4x4(Vec3 eye, Vec3 focus, Vec3 up) {
     Vec3 eye_dir = sub3(focus, eye);
     Vec3 R2 = norm3(eye_dir);
 
@@ -89,7 +90,7 @@ static Mat4 look_at4x4(Vec3 eye, Vec3 focus, Vec3 up) {
                    }};
 }
 
-static Vec4 mul4x44(Mat4 m, Vec4 v) {
+ Vec4 mul4x44(Mat4 m, Vec4 v) {
     Vec4 res;
     for(int x = 0; x < 4; ++x) {
         float sum = 0;

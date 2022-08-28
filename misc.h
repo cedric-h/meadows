@@ -41,7 +41,6 @@
 #define COLOR_FORESTSHADOW  ((Color) { 0.01f, 0.46f, 0.27f, 1.00f })
 #define COLOR_GRASS_BOTTOM  ((Color) { 0.05f, 0.51f, 0.29f, 1.00f })
 
-#define STB_PERLIN_IMPLEMENTATION
 
 #define LABEL_TEXT_SIZE (0.10f)
 #include "stb_perlin.h"
@@ -137,62 +136,7 @@ typedef enum {
     PlayerAction_Casting,
 } PlayerAction;
 
-static struct {
-    double elapsed;
-
-    /* graphics */
-    Vert vbuf[1 << 16];
-    uint16_t ibuf[1 << 17];
-    int width, height;
-    float zoom;
-    Vec2 cam;
-    ManFrames mf;
-
-    /* networking */
-    uint8_t netbuf[1 << 8];
-    Other others[20];
-    uint32_t id;
-    float time_since_netout;
-
-    /* input */
-    struct {
-        uint8_t active;
-        struct { int x, y; } mouse_start;
-        struct { float x, y; } cam_start;
-    } drag;
-    uint8_t keys_down[255];
-    struct {
-        Vec2 vel;
-        Man man;
-        PlayerAction action;
-
-        Vec2 cast_target;
-    } player;
-
-    /* ui */
-    float letter_width_buf[128];
-    char todo[5][25];
-    Label labels[64];
-
-    /* gameplay? */
-    Mushroom mushrooms[1 << 8];
-    Fireball fireballs[1 << 6];
-
-} state = {0};
-
 #define WASM_EXPORT __attribute__((visibility("default")))
-
-/* the blob of magh fns llvm tries to include for us add 20kb to the WASM smh */
-static float fmodf(float x, float n) { return x - n * (int)(x/n); }
-static float signf(float x) { return (x < 0.0f) ? -1.0f : 1.0f; }
-static float fmaxf(float a, float b) { return (a > b) ? a : b; }
-static float fminf(float a, float b) { return (a < b) ? a : b; }
-extern float cosf(float);
-extern float sinf(float);
-extern float randf(void);
-extern float sqrtf(float);
-extern float printff(float);
-extern float atan2f(float, float);
 
 /* shared memory with our JS host */
 extern void   vbuf(void *ptr, int len);

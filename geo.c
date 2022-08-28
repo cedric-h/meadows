@@ -1,12 +1,11 @@
 #include <stdint.h>
-#include <stddef.h>
 
 #include "geo.h"
-#include "man.h"
 #include "gameplay.h"
+
 #include "math.h"
 
-static void geo_fireballs(Geo *geo) {
+ void geo_fireballs(Geo *geo) {
     for (int i = 0; i < ARR_LEN(state.fireballs); i++) {
         Fireball *f = state.fireballs + i;
 
@@ -18,7 +17,7 @@ static void geo_fireballs(Geo *geo) {
     }
 }
 
-static void geo_labels(Geo *geo) {
+ void geo_labels(Geo *geo) {
     for (int i = 0; i < ARR_LEN(state.labels); i++) {
         Label *l = state.labels + i;
 
@@ -30,7 +29,7 @@ static void geo_labels(Geo *geo) {
     }
 }
 
-static void geo_man_id(Geo *geo, Man *man, uint32_t id) {
+ void geo_man_id(Geo *geo, Man *man, uint32_t id) {
     Vec3 skin_color3 = lerp3(
             (Vec3) { 0.20f, 0.25f, 0.43f },
             (Vec3) { 0.26f, 0.19f, 0.43f },
@@ -44,7 +43,7 @@ static void geo_man_id(Geo *geo, Man *man, uint32_t id) {
     });
 }
 
-static void geo_man(Geo *geo, Man *man, Color skin_color) {
+ void geo_man(Geo *geo, Man *man, Color skin_color) {
     float z = man_pos(man, ManPartKind_Toe_R).y - 0.1f;
 
     Vec2 head = man_pos(man, ManPartKind_Head);
@@ -78,21 +77,21 @@ static void geo_man(Geo *geo, Man *man, Color skin_color) {
                  thickness*2.0f);
 }
 
-static void geo_ibuf_push(Geo *geo, uint16_t a, uint16_t b, uint16_t c) {
+ void geo_ibuf_push(Geo *geo, uint16_t a, uint16_t b, uint16_t c) {
     if ((geo->ibuf - geo->ibuf_base) < geo->ibuf_max)
         *geo->ibuf++ = a, *geo->ibuf++ = b, *geo->ibuf++ = c;
     else
         printff(500);
 }
 
-static void geo_vbuf_push(Geo *geo, Vert v) {
+ void geo_vbuf_push(Geo *geo, Vert v) {
     if ((geo->vbuf - geo->vbuf_base) < geo->vbuf_max)
         *geo->vbuf++ = v;
     else
         printff(500);
 }
 
-static void geo_quad(Geo *geo, Vert tl, Vert tr, Vert br, Vert bl) {
+ void geo_quad(Geo *geo, Vert tl, Vert tr, Vert br, Vert bl) {
     int i = geo->vbuf - geo->vbuf_base;
 
     geo_vbuf_push(geo, tl);
@@ -104,7 +103,7 @@ static void geo_quad(Geo *geo, Vert tl, Vert tr, Vert br, Vert bl) {
     geo_ibuf_push(geo, i+2, i+1, i+3);
 }
 
-static void geo_tri(Geo *geo, Vert a, Vert b, Vert c) {
+ void geo_tri(Geo *geo, Vert a, Vert b, Vert c) {
     int i = geo->vbuf - geo->vbuf_base;
 
     geo_vbuf_push(geo, a);
@@ -114,7 +113,7 @@ static void geo_tri(Geo *geo, Vert a, Vert b, Vert c) {
     geo_ibuf_push(geo, i+0, i+1, i+2);
 }
 
-static void geo_ngon(Geo *geo, Color c, float z, float x, float y, float r, float n) {
+ void geo_ngon(Geo *geo, Color c, float z, float x, float y, float r, float n) {
     int i;
     int center = geo->vbuf - geo->vbuf_base;
     geo_vbuf_push(geo, (Vert) { .pos = { x, y }, .z=z, .color = c });
@@ -138,11 +137,11 @@ static void geo_ngon(Geo *geo, Color c, float z, float x, float y, float r, floa
 
     geo_ibuf_push(geo, start, center, i);
 }
-static void geo_8gon(Geo *geo, Color c, float z, float x, float y, float r) {
+ void geo_8gon(Geo *geo, Color c, float z, float x, float y, float r) {
     geo_ngon(geo, c, z, x, y, r, 8.0f);
 }
 
-static void geo_line(Geo *geo, Color c, float z, Vec2 beg, Vec2 end, float thickness) {
+ void geo_line(Geo *geo, Color c, float z, Vec2 beg, Vec2 end, float thickness) {
     float dx = end.x - beg.x;
     float dy = end.y - beg.y;
 
@@ -164,12 +163,12 @@ static void geo_line(Geo *geo, Color c, float z, Vec2 beg, Vec2 end, float thick
     );
 }
 
-static void geo_rect(Geo *geo, Color c, float z, float x, float y, float w, float h) {
+ void geo_rect(Geo *geo, Color c, float z, float x, float y, float w, float h) {
     geo_line(geo, c, z, (Vec2) { .x = x-w/2, .y = y},
              (Vec2) { .x = x+w/2, .y = y}, h);
 }
 
-static void geo_text(Geo *geo, Color c, float z, float x, float y, char *str, float size) {
+ void geo_text(Geo *geo, Color c, float z, float x, float y, char *str, float size) {
     if (str == 0 || !*str) return;
 
     do {
@@ -186,7 +185,7 @@ static void geo_text(Geo *geo, Color c, float z, float x, float y, char *str, fl
     } while(*++str);
 }
 
-static void geo_tree(Geo *geo, float x, float _y, float size) {
+ void geo_tree(Geo *geo, float x, float _y, float size) {
     Vert *start = geo->vbuf;
     float w = 0.8f, h = GOLDEN_RATIO, r = 0.4f;
     float y = _y - 0.2f;

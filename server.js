@@ -15,10 +15,6 @@ function connect(ws) {
   });
 }
 
-<<<<<<< HEAD
 const server = app.listen(3000);
 server.on('upgrade', (...args) => wss.handleUpgrade(...args, connect));
-=======
-const server = app.listen(3000);
-server.on('upgrade', (...args) => wss.handleUpgrade(...args, connect));
->>>>>>> e3a05a21ad4be03f99add3546fb7a189692961f3
+

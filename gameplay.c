@@ -1,12 +1,14 @@
 #include "gameplay.h"
 #include "math.h"
 
-static float fireball_t(Fireball *f) {
+State state = {0};
+
+ float fireball_t(Fireball *f) {
     float duration = f->ts_fade_out - f->ts_spawned;
     return (state.elapsed - f->ts_spawned) / duration;
 }
 
-static Vec2 fireball_pos(Fireball *f) {
+ Vec2 fireball_pos(Fireball *f) {
     float t = fireball_t(f);
     return (Vec2) {
             .x = lerp(f->start.x, f->target.x, t),
@@ -14,8 +16,34 @@ static Vec2 fireball_pos(Fireball *f) {
     };
 }
 
+static float text_width(char *str, float size) {
+    /* I could simplify this loop and then verify it does the same thing as the one in
+     * geo_text ... OR I could just keep this trimmed down version of the one there ... */
+
+    if (str == 0 || !*str) return 0.0f;
+
+    float ret = 0.0f;
+    do {
+        ret += size * state.letter_width_buf[(int)*str];
+    } while(*++str);
+
+    return ret;
+}
+
+static void labels_push(Label new) {
+    new.x -= text_width(new.msg, LABEL_TEXT_SIZE)*0.5f;
+
+    for (int i = 0; i < ARR_LEN(state.labels); i++) {
+        Label *l = state.labels + i;
+        if (l->ts_fade_out <= state.elapsed) {
+            *l = new;
+            return;
+        }
+    }
+}
+
 #define SHOW_TODO(i, s) __builtin_memcpy(state.todo[(i)], (s), sizeof(s))
-static void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
+ void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
 
     /* no matter what, these exist in the world */
     Vec2 wiz = { 1.5f, 1.2f };
@@ -38,8 +66,8 @@ static void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
         QuestStage_MushRoastinDone,
     } QuestStage;
 
-    static QuestStage stage = QuestStage_Exclamation;
-    static int mushies = 0;
+     QuestStage stage = QuestStage_Exclamation;
+     int mushies = 0;
 
     uint8_t near_wiz = mag2(sub2(wiz, state.player.man.pos)) < 0.8f;
 
@@ -169,7 +197,7 @@ static void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
 }
 #undef SHOW_TODO
 
-static void man_anim(Man *man, float dt, Vec2 vel) {
+ void man_anim(Man *man, float dt, Vec2 vel) {
     uint8_t going = dot2(vel, vel) > 0.00001f;
     man->anim_damp = lerp(man->anim_damp, going, dt * 0.15f);
     man->anim_prog += 0.14f*man->anim_damp*dt;
@@ -181,7 +209,7 @@ static void man_anim(Man *man, float dt, Vec2 vel) {
     man->dir = lerp_rad(man->dir, atan2f(-vel.y, -vel.x), going*dt*0.1f);
 }
 
-static Vec2 man_pos(Man *man, ManPartKind mpk) {
+ Vec2 man_pos(Man *man, ManPartKind mpk) {
     float q = man->anim_prog;
     float t = q - round_tof(q, 1.0f);
 
@@ -206,7 +234,7 @@ static Vec2 man_pos(Man *man, ManPartKind mpk) {
                     p.y * 0.5f + man->pos.y };
 }
 
-static void label_push_i(Label *l, int i, Vec2 p) {
+ void label_push_i(Label *l, int i, Vec2 p) {
     l->drift = (LABEL_TEXT_SIZE * 1.1f) * 3;
 
     l->x = p.x;
@@ -216,4 +244,14 @@ static void label_push_i(Label *l, int i, Vec2 p) {
     l->ts_pop_in = state.elapsed + delay;
     l->ts_fade_out = state.elapsed + 300.0f + delay;
     labels_push(*l);
+}
+
+void fireballs_push(Fireball new) {
+    for (int i = 0; i < ARR_LEN(state.fireballs); i++) {
+        Fireball *f = state.fireballs + i;
+        if (f->ts_fade_out <= state.elapsed) {
+            *f = new;
+            return;
+        }
+    }
 }
