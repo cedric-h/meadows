@@ -18,9 +18,6 @@ FLAGS =   --target=wasm32 \
 clean:
 	rm -rf $(OUTDIR)
 
-serve:
-	node server.js
-
 deps:
 	sudo pacman -S clang lld nodejs npm
 	npm install express
@@ -30,15 +27,13 @@ build:
 	$(CC) $(FLAGS) -o $(OUTDIR)/main.wasm $(SOURCE)
 	cp $(COPY) $(OUTDIR)
 
-all: build serve
+all: build
 
 about:
 	@echo ""
 	@echo " meadows "
 	@echo ""
-	@echo "make serve   -  launch server"
 	@echo "make clean   -  clean temp files"
 	@echo "make build   -  just build the wasm file"
 	@echo "make deps    -  install dependencies (Arch Linux only)"
-	@echo "make all     -  build -> serve"
 	@echo ""
