@@ -7,3 +7,6 @@ ayyyy lmao
 - base-devel (maybe)
 - bash obv
 - a browser
+
+# deps (node)
+- ExpressJS (for now)
