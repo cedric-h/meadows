@@ -231,7 +231,7 @@ function createIbuf(icount) {
 
 (async () => {
 
-  const wasmSrc = fetch("build/main.wasm");
+  const wasmSrc = fetch("/main.wasm");
   let vcount, icount, netcount;
   let vbuf, ibuf, netbuf;
   let mem, ws;

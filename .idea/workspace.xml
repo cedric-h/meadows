@@ -6,23 +6,23 @@
   <component name="CMakePresetLoader">{
   &quot;useNewFormat&quot;: true
 }</component>
+  <component name="CMakeRunConfigurationManager">
+    <generated />
+  </component>
   <component name="CMakeSettings">
-    <configurations>
-      <configuration PROFILE_NAME="Debug" ENABLED="true" CONFIG_NAME="Debug" />
-    </configurations>
+    <configurations />
   </component>
   <component name="ChangeListManager">
     <list default="true" id="4604d5ff-41f3-49c0-97f0-ede7b67bd5b3" name="Changes" comment="m.mm">
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/meadows.iml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gameplay.c" beforeDir="false" afterPath="$PROJECT_DIR$/gameplay.c" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gameplay.h" beforeDir="false" afterPath="$PROJECT_DIR$/gameplay.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/geo.c" beforeDir="false" afterPath="$PROJECT_DIR$/geo.c" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/geo.h" beforeDir="false" afterPath="$PROJECT_DIR$/geo.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Makefile" beforeDir="false" afterPath="$PROJECT_DIR$/Makefile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/anim_out.py" beforeDir="false" afterPath="$PROJECT_DIR$/anim_out.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.c" beforeDir="false" afterPath="$PROJECT_DIR$/main.c" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/math.c" beforeDir="false" afterPath="$PROJECT_DIR$/math.c" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/math.h" beforeDir="false" afterPath="$PROJECT_DIR$/math.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/misc.h" beforeDir="false" afterPath="$PROJECT_DIR$/misc.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/server.js" beforeDir="false" afterPath="$PROJECT_DIR$/server.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pub/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/index.html" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -32,27 +32,52 @@
   <component name="ClangdSettings">
     <option name="formatViaClangd" value="false" />
   </component>
+  <component name="ExternalProjectsData">
+    <projectState path="$PROJECT_DIR$">
+      <ProjectState />
+    </projectState>
+  </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
-    <option name="RESET_MODE" value="KEEP" />
-  </component>
-  <component name="GitRewordedCommitMessages">
-    <option name="commitMessagesMapping">
-      <RewordedCommitMessageMapping>
-        <option name="originalMessage" value="fix" />
-        <option name="rewordedMessage" value="fix&#10;&#10;&#10;fix" />
-      </RewordedCommitMessageMapping>
-    </option>
-    <option name="currentCommit" value="1" />
-    <option name="onto" value="1a0a2ca555892ab6989a2ed87fdb4a48b670080d" />
   </component>
   <component name="MacroExpansionManager">
     <option name="directoryName" value="suvef2c0" />
   </component>
+  <component name="Make.Settings">
+    <option name="path" value="\\wsl$\Arch\usr\bin\make" />
+  </component>
+  <component name="MakefileLocalSettings">
+    <option name="toolchainName" value="WSL" />
+    <option name="availableProjects">
+      <map>
+        <entry>
+          <key>
+            <ExternalProjectPojo>
+              <option name="name" value="meadows" />
+              <option name="path" value="$PROJECT_DIR$" />
+            </ExternalProjectPojo>
+          </key>
+          <value>
+            <list>
+              <ExternalProjectPojo>
+                <option name="name" value="meadows" />
+                <option name="path" value="$PROJECT_DIR$" />
+              </ExternalProjectPojo>
+            </list>
+          </value>
+        </entry>
+      </map>
+    </option>
+    <option name="projectSyncType">
+      <map>
+        <entry key="$PROJECT_DIR$" value="RE_IMPORT" />
+      </map>
+    </option>
+  </component>
   <component name="MarkdownSettingsMigration">
     <option name="stateVersion" value="1" />
   </component>
-  <component name="ProjectId" id="2DzgcK0kYvHdIUiAhYS6DkcEeF6" />
+  <component name="ProjectId" id="2E0BiTCg1HR7AnB0E8ak1rv6jEd" />
   <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
@@ -66,17 +91,38 @@
     "WebServerToolWindowFactoryState": "false",
     "cf.first.check.clang-format": "false",
     "cidr.known.project.marker": "true",
-    "codeWithMe.voiceChat.enabledByDefault": "false",
-    "last_opened_file_path": "//wsl$/Arch/home/cheru/meadows",
+    "last_opened_file_path": "//wsl$/Arch/usr/bin/make",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
     "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "editor.preferences.fonts.default",
-    "structure.view.defaults.are.configured": "true"
+    "settings.editor.selected.configurable": "reference.settingsdialog.project.make"
   }
 }]]></component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="\\wsl$\Arch\home\cheru\meadows" />
+      <recent name="\\wsl$\Arch\home\cheru\meadows\src" />
+    </key>
+  </component>
+  <component name="RunManager">
+    <configuration default="true" type="CLionExternalRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" PASS_PARENT_ENVS_2="true">
+      <method v="2">
+        <option name="CLION.EXTERNAL.BUILD" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Makefile" type="MAKEFILE_TARGET_RUN_CONFIGURATION" factoryName="Makefile" temporary="true">
+      <makefile filename="$PROJECT_DIR$/Makefile" target="" workingDirectory="" arguments="">
+        <envs />
+      </makefile>
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Makefile Target.Makefile" />
+      </list>
+    </recent_temporary>
+  </component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
@@ -86,6 +132,9 @@
       <option name="presentableId" value="Default" />
       <updated>1661707405303</updated>
       <workItem from="1661707407525" duration="5237000" />
+      <workItem from="1661721750225" duration="747000" />
+      <workItem from="1661722536074" duration="173000" />
+      <workItem from="1661722762551" duration="5523000" />
     </task>
     <task id="LOCAL-00001" summary="m.mm">
       <created>1661713435838</created>
@@ -129,9 +178,5 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="m.mm" />
     <option name="LAST_COMMIT_MESSAGE" value="m.mm" />
-  </component>
-  <component name="XSLT-Support.FileAssociations.UIState">
-    <expand />
-    <select />
   </component>
 </project>
