@@ -833,6 +833,7 @@ static void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
           stage = QuestStage_MushPickin;
 
           Label msgs[] = {
+            { .msg = "JESSE - WE NEED TO COOK" },
             { .msg = "don't just stand there" },
             { .msg =  "get me some shrooms!" },
           };
@@ -848,7 +849,6 @@ static void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
     } break;
 
     case QuestStage_MushPickin: {
-
       SHOW_TODO(0, "- find mushrooms");
       switch (mushies) {
         case 0: SHOW_TODO(1, "  [0/3] collected"); break;
@@ -889,8 +889,10 @@ static void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
             { .msg =  "here, take this spoon"  },
           };
 
-          for (int i = 0; i < ARR_LEN(msgs); i++)
+          for (int i = 0; i < ARR_LEN(msgs); i++) {
             label_push_i(msgs + i, i, wiz);
+
+          }
         }
       }
     } break;
@@ -936,7 +938,28 @@ static void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
     } break;
 
     case QuestStage_MushRoastinDone: {
-      SHOW_TODO(0, "good job!");
+      SHOW_TODO(0, "Good job!");
+      if (near_wiz) {
+      SHOW_TODO(0, "zoinkers, save wiz!");
+      }
+      if (state.keys_down['e']) {
+          Label msgs[] = {
+            { .msg = "please save me uwu" },
+            { .msg =  "my water is boarding" },
+          };
+
+          for (int i = 0; i < ARR_LEN(msgs); i++)
+            label_push_i(msgs + i, i, wiz);
+      }
+
+       geo_man(geo,
+    &(Man){ .dir = 1.0f, .pos = { 1.0f, 1.2f }},
+    (Color) { 0.9f, 0.1f, 0.1f, 1.0f }
+    );
+    geo_man(geo,
+    &(Man){ .dir = -1.0f, .pos = { 3.0f, 1.2f }},
+    (Color) { 0.9f, 0.2f, 0.0f, 1.0f }
+    );
     } break;
   }
 
