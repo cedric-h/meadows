@@ -53,4 +53,4 @@ for name in parts:
 fill += f'}}\n'
 
 print(enum + frames + fill)
-open('person.h', 'w+').write(enum + frames + fill)
+open('man.h', 'w+').write(enum + frames + fill)
