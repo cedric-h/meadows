@@ -1,7 +1,7 @@
 OUTDIR = pub
 SOURCE = main.c geo.c gameplay.c math.c
 CC = clang
-COPY = index.html
+COPY = index.html font.png
 FLAGS =   --target=wasm32 \
           -O3 \
           -g \
