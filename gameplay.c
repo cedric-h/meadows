@@ -68,8 +68,8 @@ void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
     QuestStage_SaveWizFromMushMen,
   } QuestStage;
 
-  // static QuestStage stage = QuestStage_Exclamation;
-  static QuestStage stage = QuestStage_SaveWizFromMushMen;
+  static QuestStage stage = QuestStage_Exclamation;
+  // static QuestStage stage = QuestStage_SaveWizFromMushMen;
 
   const float talking_dist = 0.8f;
   const float seeing_dist = 2.7f;
@@ -210,7 +210,9 @@ void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
 
   case QuestStage_SaveWizFromMushMen: {
     SHOW_TODO(0, "- save wiz!");
-    SHOW_TODO(1, "- dont die!");
+    SHOW_TODO(1, "- don't die!");
+
+    static Man henchman;
   } break;
   }
   /* TODO:
