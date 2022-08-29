@@ -348,7 +348,7 @@ WASM_EXPORT void frame(int width, int height, double _dt) {
   }
 
   /* lerp cam towards player */
-  {
+  if (!state.drag.active) {
     Vec2 halsc = px_to_world_space(
       (state.zoom * (float)state. width)/2.0f,
       (state.zoom * (float)state.height)/2.0f
