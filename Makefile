@@ -28,12 +28,3 @@ build:
 	cp $(COPY) $(OUTDIR)
 
 all: build
-
-about:
-	@echo ""
-	@echo " meadows "
-	@echo ""
-	@echo "make clean   -  clean temp files"
-	@echo "make build   -  just build the wasm file"
-	@echo "make deps    -  install dependencies (Arch Linux only)"
-	@echo ""
