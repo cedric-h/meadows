@@ -1,6 +1,6 @@
 #include "math.h"
 
-/* the blob of magh fns llvm tries to include for us add 20kb to the WASM smh */
+/* the blob of math fns llvm tries to include for us add 20kb to the WASM smh */
 float round_tof(float x, float n) { return n * (int)(x / n); }
 int realmod(int x, int p) { return ((x % p) + p) % p; }
 
@@ -10,7 +10,7 @@ float fmaxf(float a, float b) { return (a > b) ? a : b; }
 float fminf(float a, float b) { return (a < b) ? a : b; }
 
 float lerp(float a, float b, float t) { return (1.0f - t) * a + t * b; }
-/* dont tell mom its just lerp_round with tau as max */
+/* don't tell mom its just lerp_round with tau as max */
 float lerp_rad(float a, float b, float t) {
   float difference = fmodf(b - a, M_PI * 2.0f),
         distance = fmodf(2.0f * difference, M_PI * 2.0f) - difference;
