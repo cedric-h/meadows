@@ -65,19 +65,22 @@ void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
     QuestStage_MushPickinDone,
     QuestStage_MushRoastin,
     QuestStage_MushRoastinDone,
+    QuestStage_SaveWizFromMushMen,
   } QuestStage;
 
-  static QuestStage stage = QuestStage_Exclamation;
-  static int mushies = 0;
+  // static QuestStage stage = QuestStage_Exclamation;
+  static QuestStage stage = QuestStage_SaveWizFromMushMen;
 
-  uint8_t near_wiz = mag2(sub2(wiz, state.player.man.pos)) < 0.8f;
+  const float talking_dist = 0.8f;
+  const float seeing_dist = 2.7f;
+  float wiz_dist = mag2(sub2(wiz, state.player.man.pos));
 
   switch (stage) {
 
   case QuestStage_Exclamation: {
     SHOW_TODO(0, "- talk to wizard");
 
-    if (near_wiz) {
+    if (wiz_dist < talking_dist) {
       SHOW_TODO(1, "- (press E)");
 
       if (state.keys_down['e']) {
@@ -99,6 +102,7 @@ void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
   } break;
 
   case QuestStage_MushPickin: {
+    static int mushies = 0;
 
     SHOW_TODO(0, "- find mushrooms");
     switch (mushies) {
@@ -133,11 +137,10 @@ void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
   case QuestStage_MushPickinDone: {
     SHOW_TODO(0, "report back to wiz");
 
-    if (near_wiz) {
+    if (wiz_dist < talking_dist) {
       SHOW_TODO(1, "- (press E)");
 
       if (state.keys_down['e']) {
-        mushies = 0;
         stage = QuestStage_MushRoastin;
 
         Label msgs[] = {
@@ -153,6 +156,8 @@ void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
   } break;
 
   case QuestStage_MushRoastin: {
+    static int mushies = 0;
+
     SHOW_TODO(0, "- roast 3 mushies");
 
     switch (mushies) {
@@ -198,7 +203,14 @@ void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
   } break;
 
   case QuestStage_MushRoastinDone: {
-    SHOW_TODO(0, "good job!");
+    SHOW_TODO(0, "report back to wiz");
+    if (wiz_dist < seeing_dist)
+      stage = QuestStage_SaveWizFromMushMen;
+  } break;
+
+  case QuestStage_SaveWizFromMushMen: {
+    SHOW_TODO(0, "- save wiz!");
+    SHOW_TODO(1, "- dont die!");
   } break;
   }
   /* TODO:

@@ -4,6 +4,11 @@
 float round_tof(float x, float n) { return n * (int)(x / n); }
 int realmod(int x, int p) { return ((x % p) + p) % p; }
 
+float fmodf(float x, float n) { return x - n * (int)(x / n); }
+float signf(float x) { return (x < 0.0f) ? -1.0f : 1.0f; }
+float fmaxf(float a, float b) { return (a > b) ? a : b; }
+float fminf(float a, float b) { return (a < b) ? a : b; }
+
 float lerp(float a, float b, float t) { return (1.0f - t) * a + t * b; }
 /* dont tell mom its just lerp_round with tau as max */
 float lerp_rad(float a, float b, float t) {

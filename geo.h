@@ -27,4 +27,4 @@ void geo_text(Geo *geo, Color c, float z, float x, float y, char *str,
               float size);
 void geo_tree(Geo *geo, float x, float _y, float size);
 void geo_pot(Geo *geo, float x, float y);
-void geo_mush(Geo *geo, float x, float y);
+void geo_mush(Geo *geo, float x, float y, uint8_t flip);

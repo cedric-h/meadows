@@ -211,10 +211,11 @@ void geo_tree(Geo *geo, float x, float _y, float size) {
   float sr = 1.22f;
   geo_8gon(geo, COLOR_FORESTSHADOW, y + sr, x, y + r, sr);
 
-  for (Vert *v = start; v != geo->vbuf; v++)
-    v->pos.x += (size - 1.0f) * (v->pos.x - x),
-        v->pos.y += (size - 1.0f) * (v->pos.y - _y),
-        v->z += (size - 1.0f) * (v->z - _y);
+  for (Vert *v = start; v != geo->vbuf; v++) {
+    v->pos.x += (size - 1.0f) * (v->pos.x - x);
+    v->pos.y += (size - 1.0f) * (v->pos.y - _y);
+    v->z += (size - 1.0f) * (v->z - _y);
+  }
 }
 
 static void geo_geo(Geo *geo, Vec2 *vpos, uint16_t *ibuf, size_t ibuf_len,
@@ -229,7 +230,7 @@ static void geo_geo(Geo *geo, Vec2 *vpos, uint16_t *ibuf, size_t ibuf_len,
 #undef POS
 }
 
-void geo_mush(Geo *geo, float x, float y) {
+void geo_mush(Geo *geo, float x, float y, uint8_t flip) {
   uint16_t mush_head_idx[] = {
       20, 15, 6,  0,  1,  2,  2,  3,  4,  4,  5,  16, 5,  6,  15, 6,  7,
       21, 7,  8,  21, 8,  22, 9,  9,  21, 8,  21, 10, 6,  10, 20, 6,  20,
@@ -316,14 +317,22 @@ void geo_mush(Geo *geo, float x, float y) {
   c.r -= 0.025f;
   c.g -= 0.05f;
   c.b -= 0.05f;
-  geo_geo(geo, mush_gills_vpos, mush_gills_idx, ARR_LEN(mush_gills_idx),
-          -0.17f * 0.2f, pos, c, scale);
 
-  geo_geo(geo, mush_head_vpos, mush_head_idx, ARR_LEN(mush_head_idx),
-          -0.16f * 0.2f, pos, COLOR_MAROON, scale);
+  Vert *start = geo->vbuf;
+  {
+    geo_geo(geo, mush_gills_vpos, mush_gills_idx, ARR_LEN(mush_gills_idx),
+            -0.17f * 0.2f, pos, c, scale);
 
-  geo_geo(geo, mush_stalk_vpos, mush_stalk_idx, ARR_LEN(mush_stalk_idx),
-          -0.18f * 0.2f, pos, COLOR_BEIGE, scale);
+    geo_geo(geo, mush_head_vpos, mush_head_idx, ARR_LEN(mush_head_idx),
+            -0.16f * 0.2f, pos, COLOR_MAROON, scale);
+
+    geo_geo(geo, mush_stalk_vpos, mush_stalk_idx, ARR_LEN(mush_stalk_idx),
+            -0.18f * 0.2f, pos, COLOR_BEIGE, scale);
+  }
+
+  float flipf = flip ? -1.0f : 1.0f;
+  for (Vert *v = start; v != geo->vbuf; v++)
+    v->pos.x += (flipf - 1.0f) * (v->pos.x - x);
 }
 
 void geo_pot(Geo *geo, float x, float y) {

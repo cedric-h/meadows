@@ -92,6 +92,8 @@ WASM_EXPORT void init(void) {
   netbuf(state.netbuf, ARR_LEN(state.netbuf));
   state.id = randf() * (float)(UINT32_MAX); // TODO: precision?
 
+  state.player.man.pos = (Vec2){-1.5f, -0.5f};
+
   state.zoom = 5.0f;
   vbuf(state.vbuf, ARR_LEN(state.vbuf));
   ibuf(state.ibuf, ARR_LEN(state.ibuf));
@@ -421,14 +423,16 @@ WASM_EXPORT void frame(int width, int height, double _dt) {
             if (onscreen_mush_i < (ARR_LEN(onscreen_mush) - 1))
               onscreen_mush[onscreen_mush_i++] = shroom;
 
-            for (float i = 0; i < 5.0f; i++) {
+            for (int j = 0; j < 5; j++) {
+              float i = j;
               if (shroom->stage == MushroomStage_Collected && i < 2.0f)
                 continue;
               if (shroom->stage == MushroomStage_Blasted && i < 3.0f)
                 continue;
-              float r = i / 5.0f * M_PI * 2.0f + size;
-              geo_mush(&geo, x + cosf(r) * (1.0f - i / 5.0f) * 0.16f,
-                       y + sinf(r) * (1.0f - i / 5.0f) * 0.16f);
+              float r = i / 5.0f * M_PI * 2.0f + size * 5.77f;
+              float mx = x + cosf(r) * (1.0f - i / 5.0f) * 0.21f;
+              float my = y + sinf(r) * (1.0f - i / 5.0f) * 0.21f;
+              geo_mush(&geo, mx, my, j % 2);
             }
           }
         }
