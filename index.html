@@ -260,6 +260,7 @@ function createIbuf(icount) {
   const wasm = instance.exports;
   mem = wasm.memory.buffer;
   wasm.init();
+  window.teleport = wasm.teleport
   await uploadFontImage(new Float32Array(mem, wasm.letter_width_buf(), 128));
 
   ws = new WebSocket(`ws://${location.host}`);

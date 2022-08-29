@@ -88,11 +88,12 @@ WASM_EXPORT void netin(int len) { /* netin ... yahoo? LMFAO */
  * is get back time you spent securing a game nobody will ever play. */
 
 WASM_EXPORT float *letter_width_buf(void) { return state.letter_width_buf; }
+WASM_EXPORT void teleport(float x, float y) {state.player.man.pos = (Vec2){x, y};}
 WASM_EXPORT void init(void) {
   netbuf(state.netbuf, ARR_LEN(state.netbuf));
   state.id = randf() * (float)(UINT32_MAX); // TODO: precision?
 
-  state.player.man.pos = (Vec2){-1.5f, -0.5f};
+  state.player.man.pos = (Vec2){-1.0f, -0.5f};
 
   state.zoom = 5.0f;
   vbuf(state.vbuf, ARR_LEN(state.vbuf));
