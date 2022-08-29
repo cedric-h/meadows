@@ -230,7 +230,6 @@ function createIbuf(icount) {
 }
 
 (async () => {
-
   const wasmSrc = fetch("/main.wasm");
   let vcount, icount, netcount;
   let vbuf, ibuf, netbuf;
@@ -260,9 +259,7 @@ function createIbuf(icount) {
     } });
   const wasm = instance.exports;
   mem = wasm.memory.buffer;
-
   wasm.init();
-
   await uploadFontImage(new Float32Array(mem, wasm.letter_width_buf(), 128));
 
   ws = new WebSocket(`ws://${location.host}`);
@@ -297,13 +294,35 @@ function createIbuf(icount) {
   window.onkeydown = e => wasm.key(1, e.key.charCodeAt(0));
   window.onkeyup   = e => wasm.key(0, e.key.charCodeAt(0));
 
+  // get line height aaaaaaaaa
+
+  let iframe = document.createElement('iframe');
+  iframe.src = '#';
+  document.body.appendChild(iframe);
+  let iwin = iframe.contentWindow;
+  let idoc = iwin.document;
+  idoc.open();
+  idoc.write('<!DOCTYPE html><html lang="en"><head><title></title></head><body><span>this is such a hack</span></body></html>');
+  idoc.close();
+  let span = idoc.body.firstElementChild;
+  const lineHeight = span.offsetHeight;
+  document.body.removeChild(iframe);
+
   function wheelHandler(e) {
-    if (e.deltaMode != WheelEvent.DOM_DELTA_PIXEL) {
-      console.error("ew. gross. im not handling this non-pixel scroll");
-      return;
+    let {pageX, pageY, deltaX, deltaY} = e
+    switch (e.deltaMode) {
+      case WheelEvent.DOM_DELTA_PIXEL:
+        break
+      case WheelEvent.DOM_DELTA_LINE:
+        deltaX = e.deltaX * lineHeight
+        deltaY = e.deltaY * lineHeight
+        break
+      default:
+        console.error("deltaMode type not known. really shouldn't happen.");
+        return
     }
     const { abs } = Math;
-    wasm.zoom(e.pageX, e.pageY, (abs(e.deltaX) > abs(e.deltaY)) ? e.deltaX : e.deltaY);
+    wasm.zoom(pageX, pageY, (abs(deltaX) > abs(deltaY)) ? deltaX : deltaY);
     e.preventDefault();
   }
   window.addEventListener('wheel', wheelHandler, { passive: false });
