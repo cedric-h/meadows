@@ -55,7 +55,8 @@ static void labels_push(Label new) {
 
     float pot_x = wiz.x - 0.325f;
     float pot_y = wiz.y + 0.35f;
-    geo_8gon(geo, COLOR_DARKGREY, pot_y-0.25f, pot_x, pot_y, 0.25f);
+    // geo_8gon(geo, COLOR_DARKGREY, pot_y-0.25f, pot_x, pot_y, 0.25f);
+    geo_pot(geo, pot_x, pot_y);
 
     /* rest of this file is stuff that changes based on where you are in quest */
     typedef enum {
@@ -66,8 +67,8 @@ static void labels_push(Label new) {
         QuestStage_MushRoastinDone,
     } QuestStage;
 
-     QuestStage stage = QuestStage_Exclamation;
-     int mushies = 0;
+    static QuestStage stage = QuestStage_Exclamation;
+    static int mushies = 0;
 
     uint8_t near_wiz = mag2(sub2(wiz, state.player.man.pos)) < 0.8f;
 

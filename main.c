@@ -424,12 +424,13 @@ WASM_EXPORT void frame(int width, int height, double _dt) {
             if (onscreen_mush_i < (ARR_LEN(onscreen_mush)-1))
               onscreen_mush[onscreen_mush_i++] = shroom;
 
-            if (shroom->stage == MushroomStage_Ripe)
-              geo_rect(&geo, COLOR_MAROON, y, x, y, 0.10f, 0.10f);
-            if (shroom->stage == MushroomStage_Collected)
-              geo_rect(&geo, COLOR_MAROON, y, x, y, 0.05f, 0.05f);
-            if (shroom->stage == MushroomStage_Blasted)
-              geo_rect(&geo, COLOR_DARKMAROON, y, x, y, 0.05f, 0.05f);
+            for (float i = 0; i < 5.0f; i++) {
+              if (shroom->stage == MushroomStage_Collected && i < 2.0f) continue;
+              if (shroom->stage == MushroomStage_Blasted && i < 3.0f) continue;
+              float r = i/5.0f * M_PI*2.0f + size;
+              geo_mush(&geo, x + cosf(r)*(1.0f - i/5.0f)*0.16f,
+                             y + sinf(r)*(1.0f - i/5.0f)*0.16f);
+            }
           }
         }
       }

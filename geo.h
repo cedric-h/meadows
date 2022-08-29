@@ -25,4 +25,6 @@ void geo_line(Geo *geo, Color c, float z, Vec2 beg, Vec2 end, float thickness);
 void geo_rect(Geo *geo, Color c, float z, float x, float y, float w, float h);
 void geo_text(Geo *geo, Color c, float z, float x, float y, char *str, float size);
 void geo_tree(Geo *geo, float x, float _y, float size);
+void geo_pot(Geo *geo, float x, float y);
+void geo_mush(Geo *geo, float x, float y);
 
