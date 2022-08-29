@@ -13,19 +13,19 @@ float dot2(Vec2 a, Vec2 b);
 float mag2(Vec2 v);
 Vec2 norm2(Vec2 v);
 Vec3 add3(Vec3 a, Vec3 b);
-Vec3 sub3(Vec3 a, Vec3 b) ;
-Vec3 mul3_f(Vec3 a, float f) ;
+Vec3 sub3(Vec3 a, Vec3 b);
+Vec3 mul3_f(Vec3 a, float f);
 Vec3 div3_f(Vec3 a, float f);
 Vec3 lerp3(Vec3 a, Vec3 b, float t);
 float dot3(Vec3 a, Vec3 b);
 float mag3(Vec3 v);
-Vec3 norm3(Vec3 v) ;
+Vec3 norm3(Vec3 v);
 Vec3 cross3(Vec3 a, Vec3 b);
-uint64_t fnv1_hash(void *key, int n_bytes) ;
-Mat4 look_at4x4(Vec3 eye, Vec3 focus, Vec3 up) ;
+uint64_t fnv1_hash(void *key, int n_bytes);
+Mat4 look_at4x4(Vec3 eye, Vec3 focus, Vec3 up);
 Vec4 mul4x44(Mat4 m, Vec4 v);
 
-static float fmodf(float x, float n) { return x - n * (int)(x/n); }
+static float fmodf(float x, float n) { return x - n * (int)(x / n); }
 static float signf(float x) { return (x < 0.0f) ? -1.0f : 1.0f; }
 static float fmaxf(float a, float b) { return (a > b) ? a : b; }
 static float fminf(float a, float b) { return (a < b) ? a : b; }

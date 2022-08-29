@@ -27,4 +27,7 @@ build:
 	$(CC) $(FLAGS) -o $(OUTDIR)/main.wasm $(SOURCE)
 	cp $(COPY) $(OUTDIR)
 
+fmt:
+	clang-format -i *.c *.h
+
 all: build

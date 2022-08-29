@@ -2,13 +2,13 @@
 #include "misc.h"
 /* a collection of geometry (vertices, indices) you can write into */
 typedef struct {
-    Vert *vbuf;
-    Vert *vbuf_base;
-    size_t vbuf_max;
+  Vert *vbuf;
+  Vert *vbuf_base;
+  size_t vbuf_max;
 
-    uint16_t *ibuf;
-    uint16_t *ibuf_base;
-    size_t ibuf_max;
+  uint16_t *ibuf;
+  uint16_t *ibuf_base;
+  size_t ibuf_max;
 } Geo;
 
 void geo_fireballs(Geo *geo);
@@ -23,8 +23,8 @@ void geo_ngon(Geo *geo, Color c, float z, float x, float y, float r, float n);
 void geo_8gon(Geo *geo, Color c, float z, float x, float y, float r);
 void geo_line(Geo *geo, Color c, float z, Vec2 beg, Vec2 end, float thickness);
 void geo_rect(Geo *geo, Color c, float z, float x, float y, float w, float h);
-void geo_text(Geo *geo, Color c, float z, float x, float y, char *str, float size);
+void geo_text(Geo *geo, Color c, float z, float x, float y, char *str,
+              float size);
 void geo_tree(Geo *geo, float x, float _y, float size);
 void geo_pot(Geo *geo, float x, float y);
 void geo_mush(Geo *geo, float x, float y);
-
