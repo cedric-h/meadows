@@ -32,7 +32,7 @@ void geo_labels(Geo *geo) {
 
 void geo_man_id(Geo *geo, Man *man, uint32_t id) {
   Vec3 skin_color3 =
-      lerp3((Vec3){0.20f, 0.25f, 0.43f}, (Vec3){0.26f, 0.19f, 0.43f},
+      lerp3((Vec3){0.10f, 0.15f, 0.33f}, (Vec3){0.36f, 0.29f, 0.53f},
             (float)id / (float)(UINT32_MAX));
 
   geo_man(geo, man,
