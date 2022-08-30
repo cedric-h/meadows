@@ -47,13 +47,6 @@ static void labels_push(Label new) {
 #define SHOW_TODO(i, s) __builtin_memcpy(state.todo[(i)], (s), sizeof(s))
 void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
 
-  // for (float i = 0; i < 10; i++) {
-  //   float f = (i / 10.0f) * M_PI * 2 + state.elapsed;
-  //   float x = cosf(f) * 0.85f;
-  //   float y = sinf(f) * 0.85f;
-  //   geo_8gon(geo, COLOR_MAROON, y - 0.75f, x, y, 0.05f);
-  // }
-
   /* no matter what, these exist in the world */
   const float wiz_x = 1.5f;
   const float wiz_y = 1.2f;

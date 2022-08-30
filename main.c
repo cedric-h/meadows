@@ -447,6 +447,38 @@ WASM_EXPORT void frame(int width, int height, double _dt) {
   __builtin_memset(state.todo, 0, sizeof(state.todo));
   quest(&geo, onscreen_mush, dt);
 
+  {
+    float tt = fmodf(state.elapsed - 1.0f, 10.0f) * 0.25f;
+    float t = fminf(0.9f, tt);
+    if (tt > 0.0f && tt < 2.0f) {
+      float n = 15.0f + (1.0f - t) * 15.0f;
+      for (float i = 0; i < n; i++) {
+        float m = (i / n) * M_PI * 2;
+
+        float q = 1.0f - t;
+        float l = 1.0f - q * q * q;
+
+        float f = m + state.elapsed;
+        float x =
+            cosf(f) * (0.20f - l * 0.15f + 0.08f * (fmodf(i, 3.0f) / 3.0f));
+        float y =
+            sinf(f) * (0.20f - l * 0.15f + 0.08f * (fmodf(i, 3.0f) / 3.0f));
+
+        Color c = color_lerp(
+            (Color){1.0f, 0.64f, 0.2f, 1.0f}, (Color){0.8f, 0.44f, 0.1f, 1.0f},
+            0.1f + 0.1f * l + 0.7f * fmodf(state.elapsed + m * 5.0f, 1.0f));
+        c.r *= l;
+        c.g *= l;
+        c.b *= l;
+        c.a *= l;
+
+        float shake = 0.025f + 0.004f / (1 - q);
+        geo_8gon(&geo, c, y - 0.75f, x + randf() * shake, y + randf() * shake,
+                 0.025f + 0.015f * l);
+      }
+    }
+  }
+
   cam_apply(geo.vbuf_base, geo.vbuf, aspect);
 
   /* things that benefit from being in -1..1 */

@@ -37,3 +37,5 @@ extern float randf(void);
 extern float sqrtf(float);
 extern float printff(float);
 extern float atan2f(float, float);
+
+Color color_lerp(Color c0, Color c1, float t);

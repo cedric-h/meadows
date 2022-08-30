@@ -4,6 +4,7 @@
 #include "geo.h"
 
 #include "math.h"
+#include "misc.h"
 
 void geo_fireballs(Geo *geo) {
   for (int i = 0; i < ARR_LEN(state.fireballs); i++) {
@@ -31,17 +32,10 @@ void geo_labels(Geo *geo) {
 }
 
 void geo_man_id(Geo *geo, Man *man, uint32_t id) {
-  Vec3 skin_color3 =
-      lerp3((Vec3){0.10f, 0.15f, 0.33f}, (Vec3){0.36f, 0.29f, 0.53f},
-            (float)id / (float)(UINT32_MAX));
-
   geo_man(geo, man,
-          (Color){
-              .r = skin_color3.x,
-              .g = skin_color3.y,
-              .b = skin_color3.z,
-              .a = 1.0f,
-          });
+          color_lerp((Color){0.10f, 0.15f, 0.33f, 1.0f},
+                     (Color){0.36f, 0.29f, 0.53f, 1.0f},
+                     (float)id / (float)(UINT32_MAX)));
 }
 
 void geo_man(Geo *geo, Man *man, Color skin_color) {

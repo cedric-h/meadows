@@ -135,3 +135,12 @@ Vec4 mul4x44(Mat4 m, Vec4 v) {
   }
   return res;
 }
+
+Color color_lerp(Color c0, Color c1, float t) {
+  return (Color){
+      .r = lerp(c0.r, c1.r, t),
+      .g = lerp(c0.g, c1.g, t),
+      .b = lerp(c0.b, c1.b, t),
+      .a = lerp(c0.a, c1.a, t),
+  };
+}
