@@ -88,7 +88,9 @@ WASM_EXPORT void netin(int len) { /* netin ... yahoo? LMFAO */
  * is get back time you spent securing a game nobody will ever play. */
 
 WASM_EXPORT float *letter_width_buf(void) { return state.letter_width_buf; }
-WASM_EXPORT void teleport(float x, float y) {state.player.man.pos = (Vec2){x, y};}
+WASM_EXPORT void teleport(float x, float y) {
+  state.player.man.pos = (Vec2){x, y};
+}
 WASM_EXPORT void init(void) {
   netbuf(state.netbuf, ARR_LEN(state.netbuf));
   state.id = randf() * (float)(UINT32_MAX); // TODO: precision?
@@ -214,7 +216,7 @@ WASM_EXPORT void zoom(int x, int y, float delta_pixels) {
 }
 
 WASM_EXPORT void frame(int width, int height, double _dt) {
-  float dt = _dt / (1000.0 / 60.0);
+  float dt = _dt / 1000.0;
   state.elapsed += dt;
 
   /* tell everyone where we are every 0.2 seconds */
@@ -330,8 +332,7 @@ WASM_EXPORT void frame(int width, int height, double _dt) {
 
   {
     static Man pacing_man = {0};
-    static float t = 0.0f;
-    t += dt;
+    float t = state.elapsed * 60.0f;
 
     Vec2 vel = {cosf(t * 0.01f + M_PI / 2), sinf(t * 0.01f + M_PI / 2)};
     Vec2 pos = {1.00f * cosf(t * 0.01f), 1.00f * sinf(t * 0.01f)};
@@ -354,8 +355,8 @@ WASM_EXPORT void frame(int width, int height, double _dt) {
                                    (state.zoom * (float)state.height) / 2.0f);
     Vec2 head = man_pos(&state.player.man, ManPartKind_Head);
     Vec2 p = mul2_f(add2(state.player.man.pos, head), 0.5f);
-    state.cam = (Vec2){lerp(state.cam.x, -p.x + halsc.x, dt * 0.04f),
-                       lerp(state.cam.y, -p.y + halsc.y, dt * 0.04f)};
+    state.cam = (Vec2){lerp(state.cam.x, -p.x + halsc.x, dt * 2.4f),
+                       lerp(state.cam.y, -p.y + halsc.y, dt * 2.4f)};
   }
 
   // geo_man(&geo, dt, 0.3f*cosf(dt*0.001f+M_PI/2),

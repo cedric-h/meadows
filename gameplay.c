@@ -47,8 +47,17 @@ static void labels_push(Label new) {
 #define SHOW_TODO(i, s) __builtin_memcpy(state.todo[(i)], (s), sizeof(s))
 void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
 
+  // for (float i = 0; i < 10; i++) {
+  //   float f = (i / 10.0f) * M_PI * 2 + state.elapsed;
+  //   float x = cosf(f) * 0.85f;
+  //   float y = sinf(f) * 0.85f;
+  //   geo_8gon(geo, COLOR_MAROON, y - 0.75f, x, y, 0.05f);
+  // }
+
   /* no matter what, these exist in the world */
-  Vec2 wiz = {1.5f, 1.2f};
+  const float wiz_x = 1.5f;
+  const float wiz_y = 1.2f;
+  Vec2 wiz = {wiz_x, wiz_y};
 
   geo_man(geo, &(Man){.dir = -0.88f, .pos = wiz},
           (Color){0.19f, 0.24f, 0.60f, 1.0f});
@@ -212,7 +221,13 @@ void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
     SHOW_TODO(0, "- save wiz!");
     SHOW_TODO(1, "- don't die!");
 
-    static Man henchman;
+    static Man henchman0 = {.pos = {wiz_x + 0.3f, wiz_y - 0.1f},
+                            .dir = 0.4f - 0.1f};
+    static Man henchman1 = {.pos = {wiz_x - 0.3f, wiz_y + 0.1f},
+                            .dir = 0.4f + 0.1f};
+
+    geo_man(geo, &henchman0, COLOR_DARKMAROON);
+    geo_man(geo, &henchman1, COLOR_DARKMAROON);
   } break;
   }
   /* TODO:
@@ -224,14 +239,14 @@ void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
 
 void man_anim(Man *man, float dt, Vec2 vel) {
   uint8_t going = dot2(vel, vel) > 0.00001f;
-  man->anim_damp = lerp(man->anim_damp, going, dt * 0.15f);
-  man->anim_prog += 0.14f * man->anim_damp * dt;
+  man->anim_damp = lerp(man->anim_damp, going, dt * 9.0f);
+  man->anim_prog += 8.4f * man->anim_damp * dt;
   int anim_len = ARR_LEN(state.mf.frames);
   man->anim_prog =
-      lerp_round(anim_len, man->anim_prog, going * man->anim_prog, dt * 0.05f);
+      lerp_round(anim_len, man->anim_prog, going * man->anim_prog, dt * 3.0f);
   man->anim_prog = fmodf(man->anim_prog, anim_len);
 
-  man->dir = lerp_rad(man->dir, atan2f(-vel.y, -vel.x), going * dt * 0.1f);
+  man->dir = lerp_rad(man->dir, atan2f(-vel.y, -vel.x), going * dt * 6.0f);
 }
 
 Vec2 man_pos(Man *man, ManPartKind mpk) {
