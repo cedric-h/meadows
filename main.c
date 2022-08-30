@@ -452,11 +452,12 @@ WASM_EXPORT void frame(int width, int height, double _dt) {
     float t = fminf(0.9f, tt);
     if (tt > 0.0f && tt < 2.0f) {
       float n = 15.0f + (1.0f - t) * 15.0f;
+
+      float q = 1.0f - t;
+      float l = 1.0f - q * q * q;
+
       for (float i = 0; i < n; i++) {
         float m = (i / n) * M_PI * 2;
-
-        float q = 1.0f - t;
-        float l = 1.0f - q * q * q;
 
         float f = m + state.elapsed;
         float x =
@@ -473,8 +474,27 @@ WASM_EXPORT void frame(int width, int height, double _dt) {
         c.a *= l;
 
         float shake = 0.025f + 0.004f / (1 - q);
-        geo_8gon(&geo, c, y - 0.75f, x + randf() * shake, y + randf() * shake,
-                 0.025f + 0.015f * l);
+        geo_8gon(&geo, c, y - 0.75f, x + (0.5f - randf()) * shake,
+                 y + (0.5f - randf()) * shake, 0.025f + 0.015f * l);
+      }
+
+      for (float i = 0.0f; i < 5.0f; i++) {
+        float m = (i / 5.0f) * M_PI * 2;
+
+        float f = m + state.elapsed;
+        float s = 0.18f + q * 0.22f;
+        float x = cosf(f) * s * 0.25f;
+        float y = sinf(f) * s * 0.25f;
+
+        Color c = color_lerp(
+            (Color){1.0f, 0.64f, 0.2f, 1.0f}, (Color){0.8f, 0.44f, 0.1f, 1.0f},
+            0.1f + 0.1f * l + 0.7f * fmodf(state.elapsed, 1.0f));
+        c.r *= l * 0.3f + i * 0.06f;
+        c.g *= l * 0.3f + i * 0.06f;
+        c.b *= l * 0.3f + i * 0.06f;
+        c.a *= l * 0.3f + i * 0.06f;
+        geo_ngon(&geo, c, y - 0.75f, x + (0.5f - randf()) * 0.06f,
+                 y + (0.5f - randf()) * 0.06f, s * 0.7f, 20);
       }
     }
   }
