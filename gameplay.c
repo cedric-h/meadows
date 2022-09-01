@@ -67,6 +67,8 @@ static void labels_push(Label new) {
 #define SHOW_TODO(i, s) __builtin_memcpy(state.todo[(i)], (s), sizeof(s))
 void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
 
+  geo_cave(geo);
+
   /* no matter what, these exist in the world */
   const float wiz_x = 1.5f;
   const float wiz_y = 1.2f;

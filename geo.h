@@ -29,6 +29,8 @@ void geo_tree(Geo *geo, float x, float _y, float size);
 void geo_pot(Geo *geo, float x, float y);
 void geo_mush(Geo *geo, float x, float y, uint8_t flip);
 
+void geo_cave(Geo *geo);
+
 typedef enum {
   FireballStage_Charge,
   FireballStage_Flying,
