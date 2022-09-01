@@ -2,13 +2,16 @@
 #include "geo.h"
 #include "misc.h"
 
+float fireball_flying_t(Fireball *f);
+float fireball_charging_t(Fireball *f);
+float fireball_dying_t(Fireball *f);
 float fireball_t(Fireball *f);
 Vec2 fireball_pos(Fireball *f);
 void quest(Geo *geo, Mushroom **onscreen_mush, float dt);
 void man_anim(Man *man, float dt, Vec2 vel);
 Vec2 man_pos(Man *man, ManPartKind mpk);
 void label_push_i(Label *l, int i, Vec2 p);
-void fireballs_push(Fireball new);
+void fireballs_push(Vec2 start, Vec2 target);
 typedef struct {
   double elapsed;
 

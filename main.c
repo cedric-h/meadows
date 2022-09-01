@@ -96,6 +96,7 @@ WASM_EXPORT void init(void) {
   state.id = randf() * (float)(UINT32_MAX); // TODO: precision?
 
   state.player.man.pos = (Vec2){-1.0f, -0.5f};
+  state.player.man.hp = state.player.man.max_hp = 1.0f;
 
   state.zoom = 5.0f;
   vbuf(state.vbuf, ARR_LEN(state.vbuf));
@@ -295,13 +296,13 @@ WASM_EXPORT void frame(int width, int height, double _dt) {
     Color magic = {0.2f, 0.64f, 0.8f, 1.0f};
     Vec2 p = add2(state.player.cast_target, state.player.man.pos);
     for (int u = 0; u < 5; u++) {
-      float ur = (state.elapsed * 300.0f + (float)u / 5.0f) * (M_PI * 2.0f);
+      float ur = state.elapsed * 3.0f + ((float)u / 5.0f) * (M_PI * 2.0f);
       Vec2 up = {p.x + cosf(ur) * 0.25f, p.y + sinf(ur) * 0.25f};
 
       geo_8gon(&geo, magic, up.y, up.x, up.y, 0.01f);
 
       for (int v = 0; v < 5; v++) {
-        float vr = (-state.elapsed * 300.0f + (float)v / 5.0f) * (M_PI * 2.0f);
+        float vr = state.elapsed * 3.0f + ((float)v / 5.0f) * (M_PI * 2.0f);
         Vec2 vp = {p.x + cosf(vr) * 0.25f, p.y + sinf(vr) * 0.25f};
 
         Color m = magic;
@@ -315,15 +316,9 @@ WASM_EXPORT void frame(int width, int height, double _dt) {
     if (!state.keys_down[' ']) {
       state.player.action = PlayerAction_Walking;
 
-      Vec2 target = p;
       Vec2 start = add2(state.player.man.pos, (Vec2){0, 0.75f});
-      float dist = mag2(sub2(start, p));
-      fireballs_push((Fireball){
-          .ts_spawned = state.elapsed,
-          .ts_fade_out = state.elapsed + fminf(50.0f, dist * 30.0f),
-          .start = start,
-          .target = target,
-      });
+      Vec2 target = p;
+      fireballs_push(start, target);
     }
   } break;
   }
@@ -331,7 +326,7 @@ WASM_EXPORT void frame(int width, int height, double _dt) {
   geo_man_id(&geo, &state.player.man, state.id);
 
   {
-    static Man pacing_man = {0};
+    static Man pacing_man = {.hp = 1.0f};
     float t = state.elapsed * 60.0f;
 
     Vec2 vel = {cosf(t * 0.01f + M_PI / 2), sinf(t * 0.01f + M_PI / 2)};
@@ -445,63 +440,14 @@ WASM_EXPORT void frame(int width, int height, double _dt) {
   // printff(onscreen_mush_i);
 
   __builtin_memset(state.todo, 0, sizeof(state.todo));
+  if (state.player.man.hp < state.player.man.max_hp)
+    state.player.man.hp += 0.0001f;
   quest(&geo, onscreen_mush, dt);
 
-  {
-    float tt = fmodf(state.elapsed - 1.0f, 10.0f) * 0.25f;
-    float t = fminf(0.9f, tt);
-    if (tt > 0.0f && tt < 2.0f) {
-      float n = 15.0f + (1.0f - t) * 15.0f;
-
-      float q = 1.0f - t;
-      float l = 1.0f - q * q * q;
-
-      for (float i = 0; i < n; i++) {
-        float m = (i / n) * M_PI * 2;
-
-        float f = m + state.elapsed;
-        float x =
-            cosf(f) * (0.20f - l * 0.15f + 0.08f * (fmodf(i, 3.0f) / 3.0f));
-        float y =
-            sinf(f) * (0.20f - l * 0.15f + 0.08f * (fmodf(i, 3.0f) / 3.0f));
-
-        Color c = color_lerp(
-            (Color){1.0f, 0.64f, 0.2f, 1.0f}, (Color){0.8f, 0.44f, 0.1f, 1.0f},
-            0.1f + 0.1f * l + 0.7f * fmodf(state.elapsed + m * 5.0f, 1.0f));
-        c.r *= l;
-        c.g *= l;
-        c.b *= l;
-        c.a *= l;
-
-        float shake = 0.025f + 0.004f / (1 - q);
-        geo_8gon(&geo, c, y - 0.75f, x + (0.5f - randf()) * shake,
-                 y + (0.5f - randf()) * shake, 0.025f + 0.015f * l);
-      }
-
-      for (float i = 0.0f; i < 5.0f; i++) {
-        float m = (i / 5.0f) * M_PI * 2;
-
-        float f = m + state.elapsed;
-        float s = 0.18f + q * 0.22f;
-        float x = cosf(f) * s * 0.25f;
-        float y = sinf(f) * s * 0.25f;
-
-        Color c = color_lerp(
-            (Color){1.0f, 0.64f, 0.2f, 1.0f}, (Color){0.8f, 0.44f, 0.1f, 1.0f},
-            0.1f + 0.1f * l + 0.7f * fmodf(state.elapsed, 1.0f));
-        c.r *= l * 0.3f + i * 0.06f;
-        c.g *= l * 0.3f + i * 0.06f;
-        c.b *= l * 0.3f + i * 0.06f;
-        c.a *= l * 0.3f + i * 0.06f;
-        geo_ngon(&geo, c, y - 0.75f, x + (0.5f - randf()) * 0.06f,
-                 y + (0.5f - randf()) * 0.06f, s * 0.7f, 20);
-      }
-    }
-  }
-
+  /* the big cam_apply, for the entire world (almost all assets) */
   cam_apply(geo.vbuf_base, geo.vbuf, aspect);
 
-  /* things that benefit from being in -1..1 */
+  /* no cam_apply gets called for this, it it's easier to do in -1..1 */
   { geo_rect(&geo, COLOR_GRASS_BOTTOM, 0.99f, -0.0f, -0.0f, 2.0f, 2.0f); }
 
   /* until we start sorting all the tris for alpha ... */

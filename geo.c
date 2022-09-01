@@ -6,19 +6,6 @@
 #include "math.h"
 #include "misc.h"
 
-void geo_fireballs(Geo *geo) {
-  for (int i = 0; i < ARR_LEN(state.fireballs); i++) {
-    Fireball *f = state.fireballs + i;
-
-    if (f->ts_fade_out > state.elapsed) {
-      Vec2 pos = fireball_pos(f);
-      float t = 1 - fireball_t(f);
-      geo_8gon(geo, (Color){0.8f, 0.4f, 0.2f, 1.0f}, pos.y - 0.1f - t * 0.65f,
-               pos.x, pos.y, 0.1f);
-    }
-  }
-}
-
 void geo_labels(Geo *geo) {
   for (int i = 0; i < ARR_LEN(state.labels); i++) {
     Label *l = state.labels + i;
@@ -38,11 +25,50 @@ void geo_man_id(Geo *geo, Man *man, uint32_t id) {
                      (float)id / (float)(UINT32_MAX)));
 }
 
+void geo_hp(Geo *geo, float z, float x, float y, float t) {
+  if (t > 0.97f)
+    return;
+
+  float height = 0.062f;
+  float width = 0.33f;
+  Vec2 pos = {x, y};
+  Vec2 _beg = {-width / 2, 0.0f};
+  Vec2 _end = {width / 2, 0.0f};
+
+  Color c = color_lerp(COLOR_RED, COLOR_GREEN, t);
+
+  {
+    Vec2 beg = _beg;
+    Vec2 end = _beg;
+    end.x = -width / 2 + t * width;
+    geo_line(geo, c, z, add2(beg, pos), add2(end, pos), height);
+  }
+
+  {
+    Vec2 beg = add2(_beg, pos);
+    Vec2 end = add2(_end, pos);
+    Vec2 o = {0.0f, height / 2};
+
+    geo_line(geo, c, z, add2(beg, o), add2(end, o), 0.015f);
+    geo_line(geo, c, z, sub2(beg, o), sub2(end, o), 0.015f);
+
+    geo_line(geo, c, z, add2(beg, o), sub2(beg, o), 0.015f);
+    geo_line(geo, c, z, add2(end, o), sub2(end, o), 0.015f);
+
+    geo_line(geo, c, z, add2(beg, o), add2(end, o), 0.015f);
+  }
+}
+
 void geo_man(Geo *geo, Man *man, Color skin_color) {
   float z = man_pos(man, ManPartKind_Toe_R).y - 0.1f;
 
   Vec2 head = man_pos(man, ManPartKind_Head);
   geo_ngon(geo, skin_color, z, head.x, head.y, 0.08f, 32);
+
+  {
+    float z = head.y - 0.64f;
+    geo_hp(geo, z - 0.2f, head.x, z - 0.0f, man->hp / man->max_hp);
+  }
 
   typedef struct {
     ManPartKind lhs, rhs;
@@ -471,4 +497,78 @@ void geo_pot(Geo *geo, float x, float y) {
 
   geo_geo(geo, pot_top_vpos, pot_top_idx, ARR_LEN(pot_top_idx), -0.0028f, pos,
           (Color){0.34f, 0.34f, 0.34f + 0.1f, 1.00f}, scale);
+}
+
+void geo_fireball(Geo *geo, float z, float _x, float _y, FireballStage stage,
+                  float t) {
+  t = fminf(0.9f, t);
+  if (stage == FireballStage_Flying)
+    t = 0.9f;
+
+  float n = 15.0f + (1.0f - t) * 15.0f;
+
+  float q = 1.0f - t;
+  float l = 1.0f - q * q * q;
+
+  for (float i = 0; i < n; i++) {
+    float m = (i / n) * M_PI * 2;
+
+    float f = m + state.elapsed;
+    float x =
+        _x + cosf(f) * (0.20f - l * 0.15f + 0.08f * (fmodf(i, 3.0f) / 3.0f));
+    float y =
+        _y + sinf(f) * (0.20f - l * 0.15f + 0.08f * (fmodf(i, 3.0f) / 3.0f));
+
+    Color c = color_lerp(
+        (Color){1.0f, 0.64f, 0.2f, 1.0f}, (Color){0.8f, 0.44f, 0.1f, 1.0f},
+        0.1f + 0.1f * l + 0.7f * fmodf(state.elapsed + m * 5.0f, 1.0f));
+    c.r *= l;
+    c.g *= l;
+    c.b *= l;
+    c.a *= l;
+
+    float shake = 0.025f + 0.004f / (1 - q);
+    geo_8gon(geo, c, y + z, x + (0.5f - randf()) * shake,
+             y + (0.5f - randf()) * shake, 0.025f + 0.015f * l);
+  }
+
+  for (float i = 0.0f; i < 5.0f; i++) {
+    float m = (i / 5.0f) * M_PI * 2;
+
+    float f = m + state.elapsed;
+    float s = 0.18f + q * 0.22f;
+    float x = _x + cosf(f) * s * 0.25f;
+    float y = _y + sinf(f) * s * 0.25f;
+
+    Color c = color_lerp((Color){1.0f, 0.64f, 0.2f, 1.0f},
+                         (Color){0.8f, 0.44f, 0.1f, 1.0f},
+                         0.1f + 0.1f * l + 0.7f * fmodf(state.elapsed, 1.0f));
+    c.r *= l * 0.3f + i * 0.06f;
+    c.g *= l * 0.3f + i * 0.06f;
+    c.b *= l * 0.3f + i * 0.06f;
+    c.a *= l * 0.3f + i * 0.06f;
+    geo_ngon(geo, c, y + z, x + (0.5f - randf()) * 0.06f,
+             y + (0.5f - randf()) * 0.06f, s * 0.7f, 20);
+  }
+}
+
+void geo_fireballs(Geo *geo) {
+  for (int i = 0; i < ARR_LEN(state.fireballs); i++) {
+    Fireball *f = state.fireballs + i;
+    float t = fireball_t(f);
+
+    if (t > 0.0f && t < 1.0f) {
+      Vec2 pos = fireball_pos(f);
+      float z = pos.y - 2.0f; //  + (2.05f * (0.5f + 0.5f * (1.0f - t)));
+
+      float charge_t = fireball_charging_t(f);
+      float die_t = fireball_dying_t(f);
+      if (charge_t > 0.0f && charge_t < 1.0f)
+        geo_fireball(geo, z, pos.x, pos.y, FireballStage_Charge, charge_t);
+      else if (die_t > 0.0f && die_t < 1.0f)
+        ;
+      else
+        geo_fireball(geo, z, pos.x, pos.y, FireballStage_Flying, charge_t);
+    }
+  }
 }

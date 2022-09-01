@@ -29,6 +29,7 @@ float fmodf(float x, float n);
 float signf(float x);
 float fmaxf(float a, float b);
 float fminf(float a, float b);
+float norm_clampf(float t);
 
 /* yoinked from WASM */
 extern float cosf(float);

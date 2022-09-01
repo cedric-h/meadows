@@ -3,13 +3,33 @@
 
 State state = {0};
 
+/* how far between "spawned" and "charged" are you? */
+float fireball_charging_t(Fireball *f) {
+  float duration = f->ts_charged - f->ts_spawned;
+  return (state.elapsed - f->ts_spawned) / duration;
+}
+
+/* how far between "charged" and "exploded" are you? */
+float fireball_flying_t(Fireball *f) {
+  float duration = f->ts_exploded - f->ts_charged;
+  return (state.elapsed - f->ts_charged) / duration;
+}
+
+/* how far between "charged" and "exploded" are you? */
+float fireball_dying_t(Fireball *f) {
+  float duration = f->ts_fade_out - f->ts_exploded;
+  return (state.elapsed - f->ts_exploded) / duration;
+}
+
+/* the time between when the fireball appears and when it dies; its whole
+ * lifetime */
 float fireball_t(Fireball *f) {
   float duration = f->ts_fade_out - f->ts_spawned;
   return (state.elapsed - f->ts_spawned) / duration;
 }
 
 Vec2 fireball_pos(Fireball *f) {
-  float t = fireball_t(f);
+  float t = norm_clampf(fireball_flying_t(f));
   return (Vec2){
       .x = lerp(f->start.x, f->target.x, t),
       .y = lerp(f->start.y, f->target.y, t),
@@ -52,7 +72,7 @@ void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
   const float wiz_y = 1.2f;
   Vec2 wiz = {wiz_x, wiz_y};
 
-  geo_man(geo, &(Man){.dir = -0.88f, .pos = wiz},
+  geo_man(geo, &(Man){.dir = -0.88f, .pos = wiz, .hp = 1.0f},
           (Color){0.19f, 0.24f, 0.60f, 1.0f});
 
   float pot_x = wiz.x - 0.325f;
@@ -68,6 +88,7 @@ void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
     QuestStage_MushRoastin,
     QuestStage_MushRoastinDone,
     QuestStage_SaveWizFromMushMen,
+    QuestStage_Done,
   } QuestStage;
 
   static QuestStage stage = QuestStage_Exclamation;
@@ -98,7 +119,7 @@ void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
       }
     }
 
-    float excl_y = wiz.y + 0.9f + sinf(state.elapsed * 0.06f) * 0.06f;
+    float excl_y = wiz.y + 0.9f + sinf(state.elapsed * 3.6f) * 0.06f;
     geo_rect(geo, COLOR_TEXT, excl_y - 1.0f, wiz.x, excl_y, 0.04f, 0.2f);
 
   } break;
@@ -214,17 +235,119 @@ void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
     SHOW_TODO(0, "- save wiz!");
     SHOW_TODO(1, "- don't die!");
 
-    static Man henchman0 = {.pos = {wiz_x + 0.3f, wiz_y - 0.1f},
-                            .dir = 0.4f - 0.1f};
-    static Man henchman1 = {.pos = {wiz_x - 0.3f, wiz_y + 0.1f},
-                            .dir = 0.4f + 0.1f};
+    static Man henchmen[] = {{.pos = {wiz_x + 0.3f, wiz_y - 0.1f},
+                              .dir = 0.4f - 0.1f,
+                              .hp = 0.2f,
+                              .max_hp = 0.2f},
+                             {.pos = {wiz_x - 0.3f, wiz_y + 0.1f},
+                              .dir = 0.4f + 0.1f,
+                              .hp = 0.2f,
+                              .max_hp = 0.2f}};
 
-    geo_man(geo, &henchman0, COLOR_DARKMAROON);
-    geo_man(geo, &henchman1, COLOR_DARKMAROON);
+    static uint8_t pissed_off = 0;
+    static uint32_t attack_timer = 0;
+
+    /* if you're close to any of the henchmen, one of them prepares to attack*/
+    {
+      float closest = 1000.0f;
+      for (int i = 0; i < ARR_LEN(henchmen); i++) {
+        Man *hench = henchmen + i;
+        if (hench->hp <= 0.0f)
+          continue;
+
+        closest = fminf(closest, mag2(sub2(hench->pos, state.player.man.pos)));
+      }
+
+      /* incrementing the attack timer gradually gives you time to prepare */
+      if (closest < seeing_dist || pissed_off)
+        attack_timer++;
+
+      if (attack_timer > 120) {
+        attack_timer = 0;
+
+        /* start a random place in the array, */
+        int offset = (int)(state.elapsed * 5000.0f);
+
+        /* but iterate through til we find a living henchman to attack for us */
+        for (int i = 0; i < ARR_LEN(henchmen); i++) {
+          Man *hench = henchmen + ((offset + i) % ARR_LEN(henchmen));
+          if (hench->hp <= 0.0f)
+            continue;
+
+          Vec2 start = add2(hench->pos, (Vec2){0, 0.75f});
+          Vec2 target = state.player.man.pos;
+          fireballs_push(start, target);
+          break;
+        }
+      }
+    }
+
+    /* is an exploding fireball close enough to hurt anyone? */
+    {
+      const float HURTING_DIST = 0.3f;
+
+      for (int i = 0; i < ARR_LEN(state.fireballs); i++) {
+        Fireball *f = state.fireballs + i;
+        float die_t = fireball_dying_t(f);
+        Vec2 pos = fireball_pos(f);
+
+        /* if it's not in the first bit of its dying stage,
+         * >>> it's not real and it can't hurt you. <<< */
+        if (die_t < 0.05f || die_t > 0.1f)
+          continue;
+
+        float player_dist = mag2(sub2(pos, state.player.man.pos));
+        if (player_dist < HURTING_DIST) {
+          state.player.man.hp -= 0.1f;
+          __builtin_memset(f, 0, sizeof(Fireball));
+        }
+
+        for (int i = 0; i < ARR_LEN(henchmen); i++) {
+          Man *hench = henchmen + i;
+          float hench_dist = mag2(sub2(pos, hench->pos));
+          if (hench->hp <= 0.0f)
+            continue;
+
+          if (hench_dist < HURTING_DIST) {
+            hench->hp -= 0.1f;
+            pissed_off = 1;
+            __builtin_memset(f, 0, sizeof(Fireball));
+          }
+        }
+      }
+    }
+
+    /* gotta put them suckers on the screen */
+    for (int i = 0; i < ARR_LEN(henchmen); i++) {
+      Man *hench = henchmen + i;
+      if (hench->hp <= 0.0f)
+        continue;
+
+      geo_man(geo, hench, COLOR_DARKMAROON);
+    }
+
+    /* if they're all dead, you win */
+    int living_henches = 0;
+    for (int i = 0; i < ARR_LEN(henchmen); i++) {
+      Man *hench = henchmen + i;
+      if (hench->hp <= 0.0f)
+        continue;
+
+      living_henches += 1;
+    }
+
+    if (living_henches == 0) {
+      stage = QuestStage_Done;
+    }
+  } break;
+
+  case QuestStage_Done: {
+    SHOW_TODO(0, "- good job!");
   } break;
   }
+
   /* TODO:
-      - lerp dir to face player
+      - lerp wizard dir to face player
       - gradually type in TODO letters?!
   */
 }
@@ -270,13 +393,27 @@ void label_push_i(Label *l, int i, Vec2 p) {
   l->x = p.x;
   l->y = p.y + 0.75f;
 
-  float delay = i * 100.0f;
+  float delay = i * 1.66f;
   l->ts_pop_in = state.elapsed + delay;
-  l->ts_fade_out = state.elapsed + 300.0f + delay;
+  l->ts_fade_out = state.elapsed + 5.0f + delay;
   labels_push(*l);
 }
 
-void fireballs_push(Fireball new) {
+void fireballs_push(Vec2 start, Vec2 target) {
+  Vec2 delta = sub2(target, start);
+
+  /* enforce range by clipping target */
+  float dist = fminf(1.5f, mag2(delta));
+  target = add2(start, mul2_f(norm2(delta), dist));
+
+  const float units_per_second = 0.3f;
+
+  Fireball new = {.start = start, .target = target};
+  new.ts_spawned = state.elapsed;
+  new.ts_charged = new.ts_spawned + 0.3f;
+  new.ts_exploded = new.ts_charged + dist *units_per_second;
+  new.ts_fade_out = new.ts_exploded + 1.0f;
+
   for (int i = 0; i < ARR_LEN(state.fireballs); i++) {
     Fireball *f = state.fireballs + i;
     if (f->ts_fade_out <= state.elapsed) {

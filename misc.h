@@ -74,6 +74,8 @@ typedef struct {
   Vec2 pos;
   float anim_prog, anim_damp;
   float dir;
+
+  float hp, max_hp;
 } Man;
 
 typedef enum {
@@ -139,7 +141,9 @@ typedef struct {
 
 typedef struct {
   Vec2 start, target;
-  double ts_fade_out, ts_spawned;
+
+  /* these timestamps should be in ascending magnitude: */
+  double ts_spawned, ts_charged, ts_exploded, ts_fade_out;
 } Fireball;
 
 typedef enum {

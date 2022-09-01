@@ -8,6 +8,11 @@ float fmodf(float x, float n) { return x - n * (int)(x / n); }
 float signf(float x) { return (x < 0.0f) ? -1.0f : 1.0f; }
 float fmaxf(float a, float b) { return (a > b) ? a : b; }
 float fminf(float a, float b) { return (a < b) ? a : b; }
+float norm_clampf(float t) {
+  t = fmaxf(t, 0.0f);
+  t = fminf(t, 1.0f);
+  return t;
+}
 
 float lerp(float a, float b, float t) { return (1.0f - t) * a + t * b; }
 /* don't tell mom its just lerp_round with tau as max */
