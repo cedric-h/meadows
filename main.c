@@ -98,7 +98,7 @@ WASM_EXPORT void init(void) {
   state.player.man.pos = (Vec2){-1.0f, -0.5f};
   // state.player.man.pos = CAVE_POS; // (Vec2){-1.0f, -0.5f};
   // state.player.man.pos.y -= 2; // (Vec2){-1.0f, -0.5f};
-  // state.player.man.hp = state.player.man.max_hp = 1.0f;
+  state.player.man.hp = state.player.man.max_hp = 1.0f;
 
   state.zoom = 5.0f;
   vbuf(state.vbuf, ARR_LEN(state.vbuf));
