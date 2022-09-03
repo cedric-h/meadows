@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>meadows</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="" />
+  <style>
+document, body {
+  margin: 0px;
+  overflow: hidden;
+}
+  </style>
+</head>
+<body>
+  <canvas id="out"></canvas>
+  <!-- <input type="color" id="color"/> -->
+  <script>
+"use strict";
+
+function colorPickerInit(wasm) {
+  return;
+  function hexToRgb(hex) {
+    var res = hex.match(/[a-f0-9]{2}/gi);
+    return res && res.length === 3
+      ? res.map(function(v) { return parseInt(v, 16) })
+      : null;
+  }
+
+  const color = document.getElementById("color"); color.style.position = 'absolute';
+  color.style.top = '0px';
+  color.style.left = '0px';
+  color.onchange = color.oninput = () => {
+    const [ r, g, b ] = hexToRgb(color.value);
+    const color_picked = new Float32Array(wasm.memory.buffer, wasm.color_picked, 3);
+    color_picked[0] = r/255;
+    color_picked[1] = g/255;
+    color_picked[2] = b/255;
+    console.log([r, g, b, 255].map(x => (x/255).toFixed(2)+'f').join(', '));
+  }
+}
+
+const canvas = document.getElementById("out");
+const gl = canvas.getContext("webgl2", {
+  alpha: false,
+  powerPreference: "high-performance"
+});
+if (!gl) throw new Error("couldn't get gl context");
+
+const program = (() => {
+  const vertexShaderSource = `#version 300 es
+  precision highp float;
+
+  in vec4 a_position;
+  in vec4 a_color;
+
+  out vec4 v_color;
+  out vec2 v_texcoord;
+
+  void main() {
+    gl_Position = a_position;
+    gl_Position.w = 1.0f;
+    v_color = a_color;
+
+    int letter = int(floor(a_position.w));
+    vec2 letter_top_left = vec2(letter % 12, letter / 12);
+
+    int subletter = int(mod(a_position.w, 1.0f) * 4.0f);
+    vec2 letter_box = vec2(1 - subletter % 2, 1 - subletter / 2);
+
+    v_texcoord = (letter_top_left + letter_box) / 12.0f;
+    v_texcoord *= step(1.0f, float(letter));
+  }
+  `;
+
+  const fragmentShaderSource = `#version 300 es
+  precision highp float;
+
+  uniform sampler2D u_tex;
+
+  in vec4 v_color;
+  in vec2 v_texcoord;
+  out vec4 outColor;
+
+  void main() {
+    vec4 sampled = texture(u_tex, v_texcoord);
+    outColor = v_color * sampled;
+  }
+  `;
+
+  function createShader(gl, type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    const success = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
+    if (success) return shader;
+
+    throw new Error(gl.getShaderInfoLog(shader));
+  }
+
+  function createProgram(gl, vertexShader, fragmentShader) {
+    const program = gl.createProgram();
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program);
+    const success = gl.getProgramParameter(program, gl.LINK_STATUS);
+    if (success) return program;
+
+    throw new Error(gl.getProgramInfoLog(program));
+  }
+
+  return createProgram(
+    gl,
+    createShader(gl, gl.VERTEX_SHADER, vertexShaderSource),
+    createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource)
+  );
+})();
+
+const wackLoad = new FontFace(
+  "WackClubSans",
+  "url(https://cloud-599nblthw-hack-club-bot.vercel.app/0wackclubsans-regular.woff2)"
+).load();
+async function uploadFontImage(letterWidthBuf) {
+  function uploadImage(image, i, sample) {
+    // Create a texture.
+    const texture = gl.createTexture();
+   
+    // make unit 0 the active texture unit
+    // (i.e, the unit all other texture commands will affect.)
+    gl.activeTexture(gl.TEXTURE0 + i);
+   
+    // Bind texture to 'texture unit '0' 2D bind point
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+   
+    // Set the parameters so we don't need mips and so we're not filtering
+    // and we don't repeat
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, sample ?? gl.NEAREST_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, sample ?? gl.LINEAR);
+
+    // gl.generateMipmap(gl.TEXTURE_2D);
+
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+   
+    // Upload the image into the texture.
+    const mipLevel = 0;               // the largest mip
+    const internalFormat = gl.RGBA;   // format we want in the texture
+    const srcFormat = gl.RGBA;        // format of data we are supplying
+    const srcType = gl.UNSIGNED_BYTE  // type of data we are supplying
+    gl.texImage2D(gl.TEXTURE_2D,
+                  mipLevel,
+                  internalFormat,
+                  srcFormat,
+                  srcType,
+                  image);
+  }
+
+  /* generate font image */
+  const scale = 1 << 9;
+
+  {
+    document.fonts.add(await wackLoad);
+    const font = document.createElement("canvas");
+    const ctx = font.getContext("2d");
+
+    font.width = font.height = scale;
+    ctx.clearRect(0, 0, scale, scale);
+
+    ctx.fillStyle = "white";
+
+    /* so that zero-initialized letter parameters have full color */
+    ctx.fillRect(-10, -10, 10+scale/12, 10+scale/12);
+
+    const fontSize = Math.floor(scale/12);
+    ctx.textBaseline = "top";
+    ctx.font = fontSize + 'pt WackClubSans';
+    for (let i = 0; i < 128; i++) {
+      const str = String.fromCharCode(i);
+      letterWidthBuf[i] = ctx.measureText(str).width / fontSize;
+      ctx.fillText(
+        str,
+                  (i % 12) / 12 * scale,
+        Math.floor(i / 12) / 12 * scale,
+      );
+    }
+  }
+
+  const font = new Image();
+  font.src = "font.png";
+  await new Promise(res => font.onload = res);
+
+  /* TODO: figure out why canvas can't gen mipmaps? */
+  uploadImage(font, 0, gl.LINEAR);
+}
+
+
+
+// look up where the vertex data needs to go.
+const positionAttributeLocation = gl.getAttribLocation(program, "a_position");
+const colorAttributeLocation = gl.getAttribLocation(program, "a_color");
+const gl_vbuf = gl.createBuffer();
+
+const vertFloats = 8;
+const vertBytes = Float32Array.BYTES_PER_ELEMENT * vertFloats;
+
+function createVbuf(vcount) {
+
+  // Bind it to ARRAY_BUFFER (think of it as ARRAY_BUFFER = gl_vbuf)
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl_vbuf);
+  gl.bufferData(gl.ARRAY_BUFFER, vertBytes * vcount, gl.DYNAMIC_DRAW);
+
+  gl.enableVertexAttribArray(positionAttributeLocation);
+  gl.enableVertexAttribArray(colorAttributeLocation);
+
+  const colorStart = Float32Array.BYTES_PER_ELEMENT * 4;
+  /* size, type, normalize, stride, offset */
+  gl.vertexAttribPointer(
+    positionAttributeLocation, 4, gl.FLOAT, false, vertBytes, 0);
+  gl.vertexAttribPointer(
+    colorAttributeLocation, 4, gl.FLOAT, false, vertBytes, colorStart);
+}
+
+const gl_ibuf = gl.createBuffer();
+function createIbuf(icount) {
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl_ibuf);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,
+                icount * Uint16Array.BYTES_PER_ELEMENT,
+                gl.DYNAMIC_DRAW);
+}
+
+(async () => {
+  const wasmSrc = fetch("/main.wasm");
+  let vcount, icount, netcount;
+  let vbuf, ibuf, netbuf;
+  let mem, ws;
+  const { instance } =
+    await WebAssembly.instantiateStreaming(wasmSrc, { env: {
+      vbuf: (ptr, len) => {
+        vcount = len;
+        vbuf = new Float32Array(mem, ptr, len * vertFloats);
+      },
+      ibuf: (ptr, len) => {
+        icount = len;
+        ibuf = new Uint16Array(mem, ptr, len);
+      },
+      netbuf: (ptr, len) => {
+        netcount = len;
+        netbuf = new Uint8Array(mem, ptr, len);
+      },
+      netout: (ptr, len) => ws.send(new Uint8Array(mem, ptr, len)),
+      printff: console.log,
+      randf: Math.random,
+      cosf: Math.cos,
+      sinf: Math.sin,
+      roundf: Math.round,
+      sqrtf: Math.sqrt,
+      atan2f: Math.atan2,
+    } });
+  const wasm = instance.exports;
+  mem = wasm.memory.buffer;
+  wasm.init();
+  window.teleport = wasm.teleport
+  await uploadFontImage(new Float32Array(mem, wasm.letter_width_buf(), 128));
+
+  ws = new WebSocket(`ws://${location.host}`);
+  await new Promise(res => ws.onopen = res);
+  wasm.netinit();
+  ws.onmessage = async ({ data }) => {
+    const buf = new Uint8Array(await data.arrayBuffer());
+    netbuf.set(buf);
+    wasm.netin(buf.length);
+  };
+
+  colorPickerInit(wasm);
+
+  createVbuf(vcount);
+  createIbuf(icount);
+  gl.useProgram(program);
+
+  (window.onresize = () => {
+    // Tell WebGL how to convert from clip space to pixels
+    gl.viewport(
+      0,
+      0,
+      canvas.width = window.innerWidth,
+      canvas.height = window.innerHeight
+    );
+  })();
+
+  window.onmousedown = e => wasm.mouse(0, e.pageX, e.pageY);
+  window.onmouseup   = e => wasm.mouse(1, e.pageX, e.pageY);
+  window.onmousemove = e => wasm.mouse(2, e.pageX, e.pageY);
+
+  window.onkeydown = e => wasm.key(1, e.key.charCodeAt(0));
+  window.onkeyup   = e => wasm.key(0, e.key.charCodeAt(0));
+
+  // get line height aaaaaaaaa
+
+  let iframe = document.createElement('iframe');
+  iframe.src = '#';
+  document.body.appendChild(iframe);
+  let iwin = iframe.contentWindow;
+  let idoc = iwin.document;
+  idoc.open();
+  idoc.write('<!DOCTYPE html><html lang="en"><head><title></title></head><body><span>this is such a hack</span></body></html>');
+  idoc.close();
+  let span = idoc.body.firstElementChild;
+  const lineHeight = span.offsetHeight;
+  document.body.removeChild(iframe);
+
+  function wheelHandler(e) {
+    let {pageX, pageY, deltaX, deltaY} = e
+    switch (e.deltaMode) {
+      case WheelEvent.DOM_DELTA_PIXEL:
+        break
+      case WheelEvent.DOM_DELTA_LINE:
+        deltaX = e.deltaX * lineHeight
+        deltaY = e.deltaY * lineHeight
+        break
+      default:
+        console.error("deltaMode type not known. really shouldn't happen.");
+        return
+    }
+    const { abs } = Math;
+    wasm.zoom(pageX, pageY, (abs(deltaX) > abs(deltaY)) ? deltaX : deltaY);
+    e.preventDefault();
+  }
+  window.addEventListener('wheel', wheelHandler, { passive: false });
+
+  let last;
+  requestAnimationFrame(function frame(time) {
+    last ??= time;
+    const dt = time - last;
+    last = time;
+
+    gl.clearColor(0.05, 0.51, 0.29, 1.00);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.enable(gl.DEPTH_TEST);
+
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+    wasm.frame(canvas.width, canvas.height, Math.min(16*5, Math.max(0, dt)));
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, vbuf);
+    gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, ibuf);
+
+    gl.drawElements(gl.TRIANGLES, icount, gl.UNSIGNED_SHORT, 0);
+    requestAnimationFrame(frame);
+  });
+
+})();
+  </script>
+</body>
+</html>
