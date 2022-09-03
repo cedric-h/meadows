@@ -119,7 +119,7 @@ typedef struct {
 /* a persistent (enough) bit of text in world-space
  * rendered at the end of the frame (because transparency) */
 typedef struct {
-  char msg[25];
+  char msg[40];
   double ts_pop_in, ts_fade_out;
   float x, y, drift;
 

@@ -2,6 +2,8 @@
 #include "geo.h"
 #include "misc.h"
 
+#define CAVE_POS ((Vec2) { 6, 10 })
+
 float fireball_flying_t(Fireball *f);
 float fireball_charging_t(Fireball *f);
 float fireball_dying_t(Fireball *f);

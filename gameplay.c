@@ -66,10 +66,13 @@ static void labels_push(Label new) {
 
 #define SHOW_TODO(i, s) __builtin_memcpy(state.todo[(i)], (s), sizeof(s))
 void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
-
-  geo_cave(geo);
-
   /* no matter what, these exist in the world */
+
+  Vec2 intro_mine_pos = add2(CAVE_POS, (Vec2) { 1.5f, -1.8f });
+  geo_man(geo, &(Man){.dir = -0.88f, .pos = intro_mine_pos, },
+          (Color){0.55f, 0.24f, 0.30f, 1.0f});
+
+
   const float wiz_x = 1.5f;
   const float wiz_y = 1.2f;
   Vec2 wiz = {wiz_x, wiz_y};
@@ -90,11 +93,12 @@ void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
     QuestStage_MushRoastin,
     QuestStage_MushRoastinDone,
     QuestStage_SaveWizFromMushMen,
-    QuestStage_Done,
+    QuestStage_GoToMine,
+    QuestStage_MineIntro,
   } QuestStage;
 
   static QuestStage stage = QuestStage_Exclamation;
-  // static QuestStage stage = QuestStage_SaveWizFromMushMen;
+  // static QuestStage stage = QuestStage_GoToMine;
 
   const float talking_dist = 0.8f;
   const float seeing_dist = 2.7f;
@@ -339,13 +343,124 @@ void quest(Geo *geo, Mushroom **onscreen_mush, float dt) {
     }
 
     if (living_henches == 0) {
-      stage = QuestStage_Done;
+      stage = QuestStage_GoToMine;
+
+        Label msgs[] = {
+            {.msg = "..."},
+            {.msg = "now that you have had the privilege"},
+            {.msg = "of watching me singlehandedly dispatch"},
+            {.msg = "all nine of my assailants, perhaps"},
+            {.msg = "you ought to make your way to the mine."},
+            {.msg = "they're in dire need of more unskilled"},
+            {.msg = "labor there, as well."},
+            {.msg = "..."},
+            {.msg = "i see a bright future for you, y'know."},
+            {.msg = "the world needs more underpaid,"},
+            {.msg = "undervalued mushroom harvesters."},
+            {.msg = "... or at least i do ..."}
+        };
+
+        for (int i = 0; i < ARR_LEN(msgs); i++)
+          label_push_i(msgs + i, i, wiz);
+      }
+  } break;
+
+  case QuestStage_GoToMine: {
+
+    static float expiration_date = 0.0f;
+
+    float cave_dist = mag2(sub2(state.player.man.pos, CAVE_POS));
+    if (cave_dist < seeing_dist) {
+
+      if (expiration_date <= 0.00001f) {
+        expiration_date = state.elapsed + 5.0f;
+
+        Label msgs[] = {
+            {.msg = "thank god you're here!"},
+            {.msg = "the mining equipment's gone haywire!"},
+        };
+
+        for (int i = 0; i < ARR_LEN(msgs); i++)
+          label_push_i(msgs + i, i, intro_mine_pos);
+      }
+
+      if (state.elapsed > expiration_date)
+        stage = QuestStage_MineIntro;
+    } else {
+      /* draw lil red foot arrow */
+
+      Vec2 to = CAVE_POS;
+      Vec2 from = state.player.man.pos;
+      Vec2 d = norm2(sub2(to, from));
+      Vec2 p = perp2(d);
+
+      /* push it forward juuust a lil */
+      from = add2(from, mul2_f(d, 0.2f));
+
+      Color c = COLOR_RED;
+      float z = state.player.man.pos.y + 0.1f;
+
+      Vec2 o = from;
+      o = add2(o, mul2_f(d, 0.04f * (1.0f - sinf(state.elapsed*10.0f) * 0.85f)));
+      geo_tri(geo,
+              (Vert){.color = c, .z = z, .pos = add2(o, mul2_f(p, 0.04f))},
+              (Vert){.color = c, .z = z, .pos = sub2(o, mul2_f(p, 0.04f))},
+              (Vert){.color = c, .z = z, .pos = add2(o, mul2_f(d, 0.12f))});
     }
   } break;
 
-  case QuestStage_Done: {
-    SHOW_TODO(0, "- good job!");
+  case QuestStage_MineIntro: {
+
+    static Vec2 drill_pos = CAVE_POS;
+
+    typedef enum { DrillStage_Zoom, DrillStage_Targeting, DrillStage_Recharge } DrillStage;
+    static DrillStage drill_stage = DrillStage_Targeting;
+    static Vec2 drill_dir = { 0.0f, 0.0f };
+    static float charge_t = 1.0f;
+
+    const float HURTING_DIST = 0.3f;
+
+    switch (drill_stage) {
+      case DrillStage_Zoom: {
+        charge_t -= 0.75f * dt;
+
+        drill_pos = add2(drill_pos, mul2_f(drill_dir, 1.5f * dt));
+
+        float player_dist = mag2(sub2(drill_pos, state.player.man.pos));
+        if (player_dist < HURTING_DIST) {
+          state.player.man.hp -= 0.1f;
+
+          drill_stage = DrillStage_Recharge;
+          charge_t = 2.0f;
+        }
+
+        if (charge_t < 0.0f) {
+          drill_stage = DrillStage_Recharge;
+          charge_t = 1.0f;
+        }
+      } break;
+      case DrillStage_Targeting: {
+        Vec2 to = state.player.man.pos;
+        Vec2 from = drill_pos;
+        drill_dir = norm2(sub2(to, from));
+        drill_stage = DrillStage_Zoom;
+      } break;
+      case DrillStage_Recharge: {
+        charge_t -= 2.0f * dt;
+
+        if (charge_t < 0.0f) {
+          drill_stage = DrillStage_Targeting;
+          charge_t = 1.0f;
+        }
+      } break;
+    }
+
+    geo_rect(geo, COLOR_GREY, drill_pos.y - 1.0f,
+                              drill_pos.x,
+                              drill_pos.y, 0.2f, 0.2f);
+
   } break;
+
   }
 
   /* TODO:

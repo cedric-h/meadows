@@ -59,6 +59,7 @@ Vec2 div2_f(Vec2 a, float f) {
       a.y / f,
   };
 }
+Vec2 perp2(Vec2 n) { return (Vec2) { -n.y, n.x }; }
 float dot2(Vec2 a, Vec2 b) { return a.x * b.x + a.y * b.y; }
 float mag2(Vec2 v) { return sqrtf(dot2(v, v)); }
 Vec2 norm2(Vec2 v) { return div2_f(v, mag2(v)); }

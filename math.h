@@ -9,6 +9,7 @@ Vec2 add2(Vec2 a, Vec2 b);
 Vec2 sub2(Vec2 a, Vec2 b);
 Vec2 mul2_f(Vec2 a, float f);
 Vec2 div2_f(Vec2 a, float f);
+Vec2 perp2(Vec2 n);
 float dot2(Vec2 a, Vec2 b);
 float mag2(Vec2 v);
 Vec2 norm2(Vec2 v);

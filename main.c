@@ -95,7 +95,9 @@ WASM_EXPORT void init(void) {
   netbuf(state.netbuf, ARR_LEN(state.netbuf));
   state.id = randf() * (float)(UINT32_MAX); // TODO: precision?
 
-  state.player.man.pos = (Vec2){-1.0f, -0.5f};
+  // state.player.man.pos = (Vec2){-1.0f, -0.5f};
+  state.player.man.pos = CAVE_POS; // (Vec2){-1.0f, -0.5f};
+  state.player.man.pos.y -= 2; // (Vec2){-1.0f, -0.5f};
   state.player.man.hp = state.player.man.max_hp = 1.0f;
 
   state.zoom = 5.0f;
@@ -366,6 +368,8 @@ WASM_EXPORT void frame(int width, int height, double _dt) {
   Mushroom *onscreen_mush[1 << 8] = {0};
   int onscreen_mush_i = 0;
 
+  geo_cave(&geo, CAVE_POS);
+
   for (float _x = min.x; _x < max.x; _x += 0.1f)
     for (float _y = min.y; _y < max.y; _y += 0.1f) {
       /* the 0.000001f bias prevents -1.0f from getting trunced to 0 */
@@ -375,6 +379,9 @@ WASM_EXPORT void frame(int width, int height, double _dt) {
       /* the 0.05f bias centers things in their tiles */
       float x = _x + 0.05f;
       float y = _y + 0.05f;
+
+      if (mag2(sub2((Vec2){ x, y }, CAVE_POS)) < 2.5f)
+        continue;
 
       float gpn =
           fabsf(stb_perlin_fbm_noise3(x * 0.4f, y * 0.4f, 0.0f, 2, 0.5f, 6)) *
