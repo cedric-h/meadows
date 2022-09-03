@@ -95,10 +95,10 @@ WASM_EXPORT void init(void) {
   netbuf(state.netbuf, ARR_LEN(state.netbuf));
   state.id = randf() * (float)(UINT32_MAX); // TODO: precision?
 
-  // state.player.man.pos = (Vec2){-1.0f, -0.5f};
-  state.player.man.pos = CAVE_POS; // (Vec2){-1.0f, -0.5f};
-  state.player.man.pos.y -= 2; // (Vec2){-1.0f, -0.5f};
-  state.player.man.hp = state.player.man.max_hp = 1.0f;
+  state.player.man.pos = (Vec2){-1.0f, -0.5f};
+  // state.player.man.pos = CAVE_POS; // (Vec2){-1.0f, -0.5f};
+  // state.player.man.pos.y -= 2; // (Vec2){-1.0f, -0.5f};
+  // state.player.man.hp = state.player.man.max_hp = 1.0f;
 
   state.zoom = 5.0f;
   vbuf(state.vbuf, ARR_LEN(state.vbuf));
